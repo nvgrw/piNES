@@ -14,9 +14,7 @@
 *.ps
 
 #ignore junk files from compiling C code
-*.o
-emulate
-assemble
+build/
 
 #ignore junk files from compiling Haskell code
 *.hi
@@ -33,5 +31,6 @@ assemble
 *.nav
 *.toc
 
+#mac crap
 .DS_Store
 ._.DS_Store
