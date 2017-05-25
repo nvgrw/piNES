@@ -35,3 +35,4 @@ emulate/build/
 #mac crap
 .DS_Store
 ._.DS_Store
+compile_commands.json
