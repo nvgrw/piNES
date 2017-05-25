@@ -14,7 +14,8 @@
 *.ps
 
 #ignore junk files from compiling C code
-build/
+assemble/build/
+emulate/build/
 
 #ignore junk files from compiling Haskell code
 *.hi
