@@ -36,3 +36,4 @@ emulate/build/
 .DS_Store
 ._.DS_Store
 compile_commands.json
+programs/kernel.img
