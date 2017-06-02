@@ -10,6 +10,8 @@
 #define STATUS_DEFAULT 0x20
 #define NUM_INSTRUCTIONS 0x100
 
+typedef enum { INTRT_NONE, INTRT_IRQ, INTRT_NMI, INTRT_RESET } interrupt_type;
+
 /*
  * Based on specification(s) from:
  *
@@ -53,6 +55,7 @@ typedef struct {
   /* Misc */
   bool halt;
   bool addressing_special;
+  interrupt_type last_interrupt;
 } cpu;
 
 /* Opcode Vector */
@@ -82,8 +85,9 @@ void push8(cpu* cpu, uint8_t value);
 uint16_t pop16(cpu* cpu);
 void push16(cpu* cpu, uint16_t value);
 
-/* Utility Functions */
 bool is_page_crossed(uint16_t address1, uint16_t address2);
+
+void cpu_interrupt(cpu* cpu, interrupt_type type);
 
 typedef enum {
   /* A: Accumulator implied as operand */

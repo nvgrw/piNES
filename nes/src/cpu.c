@@ -4,9 +4,17 @@
 #define PAGE_MASK 0xFF00
 #define BREAK_MASK 0x10
 #define UNUSED_STATUS_MASK 0x20
+#define IV_NMI 0xFFFA
+#define IV_RESET 0xFFFC
 #define IV_IRQ_BRK 0xFFFE
 
-cpu* cpu_init() { return (cpu*)calloc(1, sizeof(cpu)); }
+cpu* cpu_init() {
+  cpu* cpu = calloc(1, sizeof(cpu));
+  cpu->register_status.raw = STATUS_DEFAULT;
+  cpu->stack_pointer = STACK_DEFAULT;
+  cpu->last_interrupt = INTRT_NONE;
+  return cpu;
+}
 
 void cpu_deinit(cpu* cpu) { free(cpu); }
 
@@ -16,8 +24,103 @@ void cpu_run(cpu* cpu) {
   }
 }
 
+void perform_irq(cpu* cpu);
+void perform_nmi(cpu* cpu);
+
 void cpu_cycle(cpu* cpu) {
-  //
+  /* Handle interrupts (work in progress) */
+  switch (cpu->last_interrupt) {
+    case INTRT_IRQ:
+      perform_irq(cpu);
+      cpu->last_interrupt = INTRT_NONE;
+      break;
+    case INTRT_NMI:
+      perform_nmi(cpu);
+      cpu->last_interrupt = INTRT_NONE;
+      break;
+    default:
+      break;
+  }
+
+  /* Fetch & Decode Instruction */
+  instruction instr =
+      INSTRUCTION_VECTOR[cpu_mem_read16(cpu, cpu->program_counter)];
+  uint8_t bytes_used = 0;
+  uint16_t address = 0;
+  /* Resolve effective address based on addressing mode */
+  switch (instr.mode) {
+    case AM_ACCUMULATOR:
+    case AM_IMPLIED:
+      cpu->addressing_special = true;
+      bytes_used = 1;
+      break;
+    case AM_IMMEDIATE:
+      address = cpu->program_counter + 1;
+      break;
+    case AM_ABSOLUTE:
+      address = cpu_mem_read16(cpu, cpu->program_counter + 1);
+      bytes_used = 3;
+      break;
+    case AM_ZERO_PAGE:
+      address = cpu_mem_read8(cpu, cpu->program_counter + 1);
+      bytes_used = 2;
+      break;
+    case AM_RELATIVE: {
+      uint8_t offset = cpu_mem_read8(cpu, cpu->program_counter + 1);
+      /*
+       * The offset is a signed integer, so if geq than 0x80, the value is
+       * actually negative.
+       * PC incremented by 2 at the end, so the offset is between -126 and 129.
+       */
+      if (offset < 0x80) {
+        address = cpu->program_counter + 2 + offset;
+      } else {
+        address = cpu->program_counter + 2 + offset - 0x100;
+      }
+      bytes_used = 2;
+    } break;
+    case AM_ABSOLUTE_X:
+      address = cpu_mem_read16(cpu, cpu->program_counter + 1) + cpu->register_x;
+      bytes_used = 3;
+      break;
+    case AM_ABSOLUTE_Y:
+      address = cpu_mem_read16(cpu, cpu->program_counter + 1) + cpu->register_y;
+      bytes_used = 3;
+      break;
+    case AM_ZERO_PAGE_X:
+      address = cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_x;
+      bytes_used = 2;
+      break;
+    case AM_ZERO_PAGE_Y:
+      address = cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_y;
+      bytes_used = 2;
+      break;
+    case AM_ZERO_PAGE_INDIRECT:
+      address = cpu_mem_read16_bug(
+          cpu, cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_x);
+      bytes_used = 2;
+      break;
+    case AM_ZERO_PAGE_INDIRECT_Y:
+      address = cpu_mem_read16_bug(
+                    cpu, cpu_mem_read8(cpu, cpu->program_counter + 1)) +
+                cpu->register_y;
+      bytes_used = 2;
+      break;
+    case AM_INDIRECT:
+      address = cpu_mem_read16_bug(
+          cpu, cpu_mem_read16(cpu, cpu->program_counter + 1));
+      bytes_used = 3;
+      break;
+  }
+
+  printf("Executing: %s,\tPC = 0x%04x, \toperand = 0x%04x, \tsp = 0x%02x\n",
+         instr.mnemonic, cpu->program_counter, address, cpu->stack_pointer);
+
+  /* Execute */
+  cpu->program_counter += bytes_used;
+  instr.implementation(cpu, address);
+
+  cpu->addressing_special = false;
 }
 
 /* Utilities */
@@ -72,6 +175,38 @@ void push16(cpu* cpu, uint16_t value) {
 
 bool is_page_crossed(uint16_t address1, uint16_t address2) {
   return (address1 & PAGE_MASK) != (address2 & PAGE_MASK);
+}
+
+void cpu_interrupt(cpu* cpu, interrupt_type type) {
+  if (type == INTRT_NONE) {
+    return;
+  }
+
+  if (type == INTRT_RESET) {
+    cpu->register_status.flags.i = 1;
+    cpu->program_counter = cpu_mem_read16(cpu, IV_RESET);
+  }
+
+  if (cpu->register_status.flags.i && type == INTRT_IRQ) {
+    return; /* Don't set interrupt if disabled */
+  }
+
+  /* Perform all other interrupts later */
+  cpu->last_interrupt = type;
+}
+
+void perform_irq(cpu* cpu) {
+  push16(cpu, cpu->program_counter);
+  push8(cpu, cpu->register_status.raw | UNUSED_STATUS_MASK);
+  cpu->register_status.flags.i = 1;
+  cpu->program_counter = cpu_mem_read16(cpu, IV_IRQ_BRK);
+}
+
+void perform_nmi(cpu* cpu) {
+  push16(cpu, cpu->program_counter);
+  push8(cpu, cpu->register_status.raw | UNUSED_STATUS_MASK);
+  cpu->register_status.flags.i = 1;
+  cpu->program_counter = cpu_mem_read16(cpu, IV_NMI);
 }
 
 /* Common to instructions */
