@@ -118,26 +118,47 @@ typedef union {
   uint8_t regs_raw[3];
 } dmc_channel;
 
-typedef union {
-  struct {
-    struct {
-      uint8_t pulse1 : 1;
-      uint8_t pulse2 : 1;
-      uint8_t triangle : 1;
-      uint8_t noise : 1;
-    } len_count_enable;
+typedef struct {
+  uint8_t pulse1 : 1;
+  uint8_t pulse2 : 1;
+  uint8_t triangle : 1;
+  uint8_t noise : 1;
+} len_count_enable;
 
+typedef union {
+  union {
+    len_count_enable len_count_enable;
     uint8_t dmc_enable : 1;
-    uint8_t waste : 3;
   } fields;
   uint8_t raw;
 } control;
+
+typedef union {
+  union {
+    len_count_enable len_count_enable;
+    uint8_t dmc_interrupt : 1;
+  } fields;
+  uint8_t raw;
+} status;
+
+typedef union {
+  struct {
+    uint8_t waste : 6;
+    uint8_t disable_frame : 1;
+    uint8_t frame5_sequence : 1;
+  } fields;
+
+  uint8_t raw;
+} frame_counter;
 
 typedef struct {
   pulse_channel pulse[2];
   triangle_channel triangle;
   noise_channel noise;
   dmc_channel dmc;
+
+  control control;
+  status status;
 } apu;
 
 /**
