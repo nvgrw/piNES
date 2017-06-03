@@ -13,11 +13,11 @@ CFLAGS ?= -I$(SPC_INCLUDE_DIR) -Wall -g -D_POSIX_SOURCE -D_BSD_SOURCE -std=c99 -
 all: dir $(SPC_BUILD_DIR)/$(SPC_BINARY)
 
 # specific dependencies
-_SDEPS = cpu
+_SDEPS = apu
 SDEPS = $(patsubst %,$(SPC_INCLUDE_DIR)/%.h,$(_SDEPS))
 
 # specific object files
-_SOBJ = nes cpu
+_SOBJ = apu
 SOBJ = $(patsubst %,$(SPC_BUILD_DIR)/%.o,$(_SOBJ))
 
 $(SPC_BUILD_DIR)/%.o: $(SPC_SOURCE_DIR)/%.c $(SDEPS)
