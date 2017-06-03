@@ -8,15 +8,6 @@
 /* using dummy memory for now
 until the cpu is done */
 
-/*
-typedef struct {
-  uint8_t duty_cycle : 2;
-  uint8_t volume : 4;
-  uint8_t raw_low;
-  uint8_t raw_high : 3;
-} pulse;
-*/
-
 /* NES is little endian */
 typedef union {
   struct {
