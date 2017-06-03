@@ -50,7 +50,7 @@ typedef struct {
    * TODO: NES Memory maps a lot of addresses, so once the CPU functional tests
    * pass, this needs to be revised
    */
-  uint8_t memory[MEMORY_SIZE];
+  uint8_t* memory;
 
   /* Misc */
   bool halt;

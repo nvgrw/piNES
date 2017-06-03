@@ -10,13 +10,17 @@
 
 cpu* cpu_init() {
   cpu* cpu = calloc(1, sizeof(cpu));
+  cpu->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
   cpu->register_status.raw = STATUS_DEFAULT;
   cpu->stack_pointer = STACK_DEFAULT;
   cpu->last_interrupt = INTRT_NONE;
   return cpu;
 }
 
-void cpu_deinit(cpu* cpu) { free(cpu); }
+void cpu_deinit(cpu* cpu) {
+  free(cpu->memory);
+  free(cpu);
+}
 
 void cpu_run(cpu* cpu) {
   while (!cpu->halt) {
