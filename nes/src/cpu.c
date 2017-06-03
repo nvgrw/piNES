@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include <assert.h>
 #include <stdio.h>
 
 #define PAGE_MASK 0xFF00
@@ -7,6 +8,8 @@
 #define IV_NMI 0xFFFA
 #define IV_RESET 0xFFFC
 #define IV_IRQ_BRK 0xFFFE
+
+#define DEBUG 1
 
 cpu* cpu_init() {
   cpu* cpu = calloc(1, sizeof(cpu));
@@ -47,8 +50,8 @@ void cpu_cycle(cpu* cpu) {
   }
 
   /* Fetch & Decode Instruction */
-  instruction instr =
-      INSTRUCTION_VECTOR[cpu_mem_read16(cpu, cpu->program_counter)];
+  uint8_t opcode = cpu_mem_read8(cpu, cpu->program_counter);
+  instruction instr = INSTRUCTION_VECTOR[opcode];
   uint8_t bytes_used = 0;
   uint16_t address = 0;
   /* Resolve effective address based on addressing mode */
@@ -60,6 +63,7 @@ void cpu_cycle(cpu* cpu) {
       break;
     case AM_IMMEDIATE:
       address = cpu->program_counter + 1;
+      bytes_used = 2;
       break;
     case AM_ABSOLUTE:
       address = cpu_mem_read16(cpu, cpu->program_counter + 1);
@@ -92,16 +96,24 @@ void cpu_cycle(cpu* cpu) {
       bytes_used = 3;
       break;
     case AM_ZERO_PAGE_X:
-      address = cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_x;
+      address =
+          (cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_x) &
+          0xFF;
+      // ^ sum wraps around zero page
       bytes_used = 2;
       break;
     case AM_ZERO_PAGE_Y:
-      address = cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_y;
+      address =
+          (cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_y) &
+          0xFF;
+      // ^ sum wraps around zero page
       bytes_used = 2;
       break;
     case AM_ZERO_PAGE_INDIRECT:
       address = cpu_mem_read16_bug(
-          cpu, cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_x);
+          cpu,
+          (cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_x) &
+              0xFF);
       bytes_used = 2;
       break;
     case AM_ZERO_PAGE_INDIRECT_Y:
@@ -117,12 +129,27 @@ void cpu_cycle(cpu* cpu) {
       break;
   }
 
-  printf("Executing: %s,\tPC = 0x%04x, \toperand = 0x%04x, \tsp = 0x%02x\n",
-         instr.mnemonic, cpu->program_counter, address, cpu->stack_pointer);
+#ifdef DEBUG
+  printf(
+      "Executing: %s + [%-6s] (0x%02x), pc = 0x%04x, op = 0x%04x, sp = 0x%02x, "
+      "st = 0x%02x, a = 0x%02x, x = 0x%02x, y = 0x%02x, tos = 0x%02x\n",
+      instr.mnemonic, dbg_address_mode_to_string(instr.mode), opcode,
+      cpu->program_counter, address, cpu->stack_pointer,
+      cpu->register_status.raw, cpu->register_a, cpu->register_x,
+      cpu->register_y, cpu_mem_read8(cpu, cpu->stack_pointer | STACK_PAGE));
+#endif
 
   /* Execute */
+  uint16_t last_program_counter = cpu->program_counter;
   cpu->program_counter += bytes_used;
   instr.implementation(cpu, address);
+
+  /* Trap detection */
+  if (cpu->program_counter == last_program_counter) {
+    printf("!!! CPU TRAPPED !!!\n");
+    dbg_print_state(cpu);
+    exit(EXIT_FAILURE);
+  }
 
   cpu->addressing_special = false;
 }
@@ -224,7 +251,12 @@ void cpu_implcommon_adc(cpu* cpu, uint16_t address, bool subtract) {
   uint8_t b =
       !subtract ? cpu_mem_read8(cpu, address) : ~cpu_mem_read8(cpu, address);
 
-  cpu->register_a = cpu->register_a + b;
+#ifdef DEBUG
+  printf("%s 0x%02x +- 0x%02x @ 0x%04x\n", subtract ? "Sub" : "Add",
+         cpu->register_a, b, address);
+#endif
+
+  cpu->register_a = cpu->register_a + b + cpu->register_status.flags.c;
 
   cpu->register_status.flags.c =
       (cpu->register_status.flags.c & ((a >> 7) ^ (b >> 7))) |
@@ -296,8 +328,8 @@ void cpu_impl_beq(cpu* cpu, uint16_t address) {
 void cpu_impl_bit(cpu* cpu, uint16_t address) {
   uint8_t memval = cpu_mem_read8(cpu, address);
   cpu->register_status.flags.v = (memval >> 6) & 0x1;
-
-  cpu_implcommon_set_zs(cpu, memval);
+  cpu->register_status.flags.s = (memval >> 7) & 0x1;
+  cpu->register_status.flags.z = (memval & cpu->register_a) == 0 ? 1 : 0;
 }
 
 // Branch on minus
@@ -309,7 +341,7 @@ void cpu_impl_bmi(cpu* cpu, uint16_t address) {
 
 // Branch on not equal
 void cpu_impl_bne(cpu* cpu, uint16_t address) {
-  if (cpu->register_status.flags.z) {
+  if (!cpu->register_status.flags.z) {
     cpu->program_counter = address;
   }
 }
@@ -366,6 +398,9 @@ void cpu_impl_clv(cpu* cpu, uint16_t address) {
 }
 
 void cpu_implcommon_cmp(cpu* cpu, uint8_t a, uint8_t b) {
+#ifdef DEBUG
+  printf("Comparing 0x%02x and 0x%02x\n", a, b);
+#endif
   cpu->register_status.flags.c = a >= b ? 1 : 0;
   cpu_implcommon_set_zs(cpu, a - b);
 }
@@ -514,7 +549,6 @@ void cpu_impl_pla(cpu* cpu, uint16_t address) {
 void cpu_impl_plp(cpu* cpu, uint16_t address) {
   cpu->register_status.raw = pop8(cpu);
   /* Set the unused bit & unset bcd mode */
-  cpu->register_status.flags.d = 0;
   cpu->register_status.raw |= STATUS_DEFAULT;
 }
 
@@ -991,3 +1025,54 @@ const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS] = {
 };
 
 #undef NULL_INSTRUCTION
+
+/* Debugging utils */
+const char* dbg_address_mode_to_string(address_mode mode) {
+  switch (mode) {
+    case AM_ACCUMULATOR:
+      return "A";
+    case AM_IMPLIED:
+      return "i";
+    case AM_IMMEDIATE:
+      return "#";
+    case AM_ABSOLUTE:
+      return "a";
+    case AM_ZERO_PAGE:
+      return "zp";
+    case AM_RELATIVE:
+      return "r";
+    case AM_ABSOLUTE_X:
+      return "a,x";
+    case AM_ABSOLUTE_Y:
+      return "a,y";
+    case AM_ZERO_PAGE_X:
+      return "zp,x";
+    case AM_ZERO_PAGE_Y:
+      return "zp,y";
+    case AM_ZERO_PAGE_INDIRECT:
+      return "(zp,x)";
+    case AM_ZERO_PAGE_INDIRECT_Y:
+      return "(zp),y";
+    case AM_INDIRECT:
+      return "(a)";
+  }
+
+  return "no string representation";
+}
+
+void dbg_print_state(cpu* cpu) {
+  printf("--- Processor State ---\n");
+  printf("pc : 0x%04x\n", cpu->program_counter);
+  printf("sp : 0x%02x\n", cpu->stack_pointer);
+  printf("a  : 0x%02x\n", cpu->register_a);
+  printf("x  : 0x%02x\n", cpu->register_x);
+  printf("y  : 0x%02x\n", cpu->register_y);
+  printf("st : 0x%02x\n", cpu->register_status.raw);
+  printf(" --> Status\n");
+  printf(" 7 6 5 4 3 2 1 0\n S V   B D I Z C\n %d %d %d %d %d %d %d %d\n",
+         cpu->register_status.flags.s, cpu->register_status.flags.v,
+         cpu->register_status.raw >> 5 & 0x1, cpu->register_status.flags.b,
+         cpu->register_status.flags.d, cpu->register_status.flags.i,
+         cpu->register_status.flags.z, cpu->register_status.flags.c);
+  printf("-----------------------\n");
+}

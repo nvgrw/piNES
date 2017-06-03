@@ -125,3 +125,8 @@ typedef struct {
 } instruction;
 
 extern const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS];
+
+/* Debugging utils */
+const char* dbg_address_mode_to_string(address_mode mode);
+
+void dbg_print_state(cpu* cpu);
