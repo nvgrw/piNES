@@ -1,10 +1,10 @@
 #include "apu.h"
 #include <stdio.h>
 
-#define START_CHANNELS 0x4000;
-#define END_CHANNELS 0x4013;
-#define STATUS 0x4015;
-#define FRAME_COUNTER 0x4017;
+#define START_CHANNELS 0x4000
+#define END_CHANNELS 0x4013
+#define STATUS 0x4015
+#define FRAME_COUNTER 0x4017
 
 bool apu_mem_is_valid(uint16_t address) {
   uint16_t translated_address = apu_mem_translate(address);
