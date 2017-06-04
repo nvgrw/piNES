@@ -9,7 +9,7 @@
 #define IV_RESET 0xFFFC
 #define IV_IRQ_BRK 0xFFFE
 
-#define DEBUG 1
+// #define DEBUG 1
 
 cpu* cpu_init() {
   cpu* cpu = calloc(1, sizeof(cpu));
@@ -132,11 +132,11 @@ void cpu_cycle(cpu* cpu) {
 #ifdef DEBUG
   printf(
       "Executing: %s + [%-6s] (0x%02x), pc = 0x%04x, op = 0x%04x, sp = 0x%02x, "
-      "st = 0x%02x, a = 0x%02x, x = 0x%02x, y = 0x%02x, tos = 0x%02x\n",
+      "st = 0x%02x, a = 0x%02x, x = 0x%02x, y = 0x%02x\n",
       instr.mnemonic, dbg_address_mode_to_string(instr.mode), opcode,
       cpu->program_counter, address, cpu->stack_pointer,
       cpu->register_status.raw, cpu->register_a, cpu->register_x,
-      cpu->register_y, cpu_mem_read8(cpu, cpu->stack_pointer | STACK_PAGE));
+      cpu->register_y);
 #endif
 
   /* Execute */
@@ -248,19 +248,19 @@ void cpu_implcommon_set_zs(cpu* cpu, uint8_t value) {
 
 void cpu_implcommon_adc(cpu* cpu, uint16_t address, bool subtract) {
   uint8_t a = cpu->register_a;
-  uint8_t b =
-      !subtract ? cpu_mem_read8(cpu, address) : ~cpu_mem_read8(cpu, address);
+  uint8_t b = cpu_mem_read8(cpu, address);
+  if (subtract) {
+    b = ~b;
+  }
 
 #ifdef DEBUG
-  printf("%s 0x%02x +- 0x%02x @ 0x%04x\n", subtract ? "Sub" : "Add",
-         cpu->register_a, b, address);
+  printf("%s 0x%02x +- 0x%02x\n", subtract ? "Sub" : "Add", a, b);
 #endif
 
-  cpu->register_a = cpu->register_a + b + cpu->register_status.flags.c;
+  uint16_t result = a + b + cpu->register_status.flags.c;
+  cpu->register_a = result;
 
-  cpu->register_status.flags.c =
-      (cpu->register_status.flags.c & ((a >> 7) ^ (b >> 7))) |
-      ((a >> 7) & (b >> 7));
+  cpu->register_status.flags.c = result > 0xFF;
   cpu->register_status.flags.v =
       ((a ^ cpu->register_a) & (b ^ cpu->register_a)) >> 7 & 0x1;
   cpu_implcommon_set_zs(cpu, cpu->register_a);

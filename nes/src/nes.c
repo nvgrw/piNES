@@ -19,8 +19,6 @@ int main(int argc, char** argv) {
   fclose(fp);
   /* - */
 
-  cpu->program_counter = 0x400;
-
   cpu_run(cpu);
   cpu_deinit(cpu);
   return EXIT_SUCCESS;
