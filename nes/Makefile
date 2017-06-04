@@ -22,11 +22,11 @@ MOD_LDFLAGS = $(SDL_LDFLAGS) $(SDL_IMAGE_LDFLAGS) $(NFD_LDFLAGS) -framework AppK
 all: dir $(SPC_BUILD_DIR)/$(SPC_BINARY)
 
 # specific dependencies
-_SDEPS = front front_sdl
+_SDEPS = error front front_sdl ppu region
 SDEPS = $(patsubst %,$(SPC_INCLUDE_DIR)/%.h,$(_SDEPS))
 
 # specific object files
-_SOBJ = front front_sdl
+_SOBJ = front front_sdl region
 SOBJ = $(patsubst %,$(SPC_BUILD_DIR)/%.o,$(_SOBJ))
 
 $(SPC_BUILD_DIR)/%.o: $(SPC_SOURCE_DIR)/%.c $(SDEPS)
