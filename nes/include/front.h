@@ -43,6 +43,8 @@ typedef struct front {
  */
 int front_rom_dialog(char* path);
 
+front* front_init(void);
+
 /**
  * Helper functions to call implementation-specific functions.
  */

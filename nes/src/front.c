@@ -18,11 +18,19 @@ int front_rom_dialog(char* path){
     memcpy(path, nfd_path, strlen(nfd_path) + 1);
     free(nfd_path);
     return EC_SUCCESS;
-  } else if (result != NFD_CANCEL) {
-    fprintf(stderr, "Error: %s\n", NFD_GetError());
   }
 
+  if (result != NFD_CANCEL) {
+    fprintf(stderr, "Error: %s\n", NFD_GetError());
+  }
   return EC_ERROR;
+}
+
+front* front_init(void) {
+  front* front = calloc(1, sizeof(front));
+  front->tab = FT_SCREEN;
+  front->scale = 1;
+  return front;
 }
 
 void front_run(front* front){
@@ -31,4 +39,5 @@ void front_run(front* front){
 
 void front_deinit(front* front){
   front->deinit(front);
+  free(front);
 }

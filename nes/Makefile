@@ -26,7 +26,7 @@ _SDEPS = error front front_sdl ppu region
 SDEPS = $(patsubst %,$(SPC_INCLUDE_DIR)/%.h,$(_SDEPS))
 
 # specific object files
-_SOBJ = front front_sdl region
+_SOBJ = front front_sdl ppu region
 SOBJ = $(patsubst %,$(SPC_BUILD_DIR)/%.o,$(_SOBJ))
 
 $(SPC_BUILD_DIR)/%.o: $(SPC_SOURCE_DIR)/%.c $(SDEPS)

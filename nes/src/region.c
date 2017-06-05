@@ -14,11 +14,11 @@ region region_get_current(void) {
   return region_current;
 }
 
-uint32_t region_screen_width(region region) {
+uint32_t region_screen_width(void) {
   return 256;
 }
 
-uint32_t region_screen_height(region region) {
+uint32_t region_screen_height(void) {
   switch (region_current) {
     case R_NTSC:
     case R_RGB3:

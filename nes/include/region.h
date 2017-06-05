@@ -29,5 +29,5 @@ region region_get_current(void);
 /**
  * Returns the screen size appropriate for the set region.
  */
-uint32_t region_screen_width();
-uint32_t region_screen_height();
+uint32_t region_screen_width(void);
+uint32_t region_screen_height(void);
