@@ -18,10 +18,10 @@ typedef enum { INTRT_NONE, INTRT_IRQ, INTRT_NMI, INTRT_RESET } interrupt_type;
  * http://nesdev.com/6502.txt
  */
 typedef struct {
-  /* Registers */
-  uint8_t register_a; /* Accumulation Register */
-  uint8_t register_x; /* Register X */
-  uint8_t register_y; /* Register Y */
+  // Registers
+  uint8_t register_a;  // Accumulation Register
+  uint8_t register_x;  // Register X
+  uint8_t register_y;  // Register Y
 
   /*
    * Status Register:
@@ -30,14 +30,14 @@ typedef struct {
    */
   union {
     struct {
-      uint8_t c : 1; /* Carry Bit */
-      uint8_t z : 1; /* Zero Bit */
-      uint8_t i : 1; /* Interrupt Disable */
-      uint8_t d : 1; /* BCD Mode (not implementd by NES 6502) */
-      uint8_t b : 1; /* Software interrupt (BRK) */
-      uint8_t : 1;   /* Unused. Should be 1 at all times */
-      uint8_t v : 1; /* Overflow */
-      uint8_t s : 1; /* Sign flag */
+      uint8_t c : 1;  // Carry Bit
+      uint8_t z : 1;  // Zero Bit
+      uint8_t i : 1;  // Interrupt Disable
+      uint8_t d : 1;  // BCD Mode (not implementd by NES 6502)
+      uint8_t b : 1;  // Software interrupt (BRK)
+      uint8_t : 1;    // Unused. Should be 1 at all times
+      uint8_t v : 1;  // Overflow
+      uint8_t s : 1;  // Sign flag
     } flags;
     uint8_t raw;
   } register_status;
@@ -45,30 +45,26 @@ typedef struct {
   uint16_t program_counter;
   uint8_t stack_pointer;
 
-  /* Memory */
+  // Memory
   /*
    * TODO: NES Memory maps a lot of addresses, so once the CPU functional tests
    * pass, this needs to be revised
    */
   uint8_t* memory;
 
-  /* Misc */
+  // Misc
   bool halt;
   bool addressing_special;
   interrupt_type last_interrupt;
 } cpu;
 
-/* Opcode Vector */
-/* Opcode Handler Vector */
-/* Address Mode Vector */
-
-/* Functions */
+// Functions
 cpu* cpu_init();
 void cpu_deinit(cpu* cpu);
 void cpu_run(cpu* cpu);
 void cpu_cycle(cpu* cpu);
 
-/* Utilities */
+// Utilities
 uint8_t cpu_mem_read8(cpu* cpu, uint16_t address);
 void cpu_mem_write8(cpu* cpu, uint16_t address, uint8_t value);
 uint16_t cpu_mem_read16(cpu* cpu, uint16_t address);
@@ -90,31 +86,31 @@ bool is_page_crossed(uint16_t address1, uint16_t address2);
 void cpu_interrupt(cpu* cpu, interrupt_type type);
 
 typedef enum {
-  /* A: Accumulator implied as operand */
+  // A: Accumulator implied as operand
   AM_ACCUMULATOR,
-  /* i: Implied by the instruction */
+  // i: Implied by the instruction
   AM_IMPLIED,
-  /* #: Operand used directly */
+  // #: Operand used directly
   AM_IMMEDIATE,
-  /* a: Absolute, full 16-bit address specified */
+  // a: Absolute, full 16-bit address specified
   AM_ABSOLUTE,
-  /* zp: Zero page, address in first memory page */
+  // zp: Zero page, address in first memory page
   AM_ZERO_PAGE,
-  /* r: Relative, signed offset added to PC */
+  // r: Relative, signed offset added to PC
   AM_RELATIVE,
-  /* a,x: Absolute indexed with X */
+  // a,x: Absolute indexed with X
   AM_ABSOLUTE_X,
-  /* a,y: Absolute indexed with Y */
+  // a,y: Absolute indexed with Y
   AM_ABSOLUTE_Y,
-  /* zp,x: Zero page indexed with X */
+  // zp,x: Zero page indexed with X
   AM_ZERO_PAGE_X,
-  /* zp,y: Zero page indexed with Y */
+  // zp,y: Zero page indexed with Y
   AM_ZERO_PAGE_Y,
-  /* (zp,x): Zero page indexed indirect */
+  // (zp,x): Zero page indexed indirect
   AM_ZERO_PAGE_INDIRECT,
-  /* (zp),y: Zero page indexed indirect with Y */
+  // (zp),y: Zero page indexed indirect with Y
   AM_ZERO_PAGE_INDIRECT_Y,
-  /* (a): Indirect */
+  // (a): Indirect
   AM_INDIRECT,
 } address_mode;
 
@@ -126,7 +122,7 @@ typedef struct {
 
 extern const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS];
 
-/* Debugging utils */
+// Debugging utils
 const char* dbg_address_mode_to_string(address_mode mode);
 
 void dbg_print_state(cpu* cpu);

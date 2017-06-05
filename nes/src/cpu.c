@@ -39,7 +39,7 @@ void perform_irq(cpu* cpu);
 void perform_nmi(cpu* cpu);
 
 void cpu_cycle(cpu* cpu) {
-  /* Handle interrupts */
+  // Handle interrupts
   switch (cpu->last_interrupt) {
     case INTRT_IRQ:
       perform_irq(cpu);
@@ -53,12 +53,12 @@ void cpu_cycle(cpu* cpu) {
       break;
   }
 
-  /* Fetch & Decode Instruction */
+  // Fetch & Decode Instruction
   uint8_t opcode = cpu_mem_read8(cpu, cpu->program_counter);
   instruction instr = INSTRUCTION_VECTOR[opcode];
   uint8_t bytes_used = 0;
   uint16_t address = 0;
-  /* Resolve effective address based on addressing mode */
+  // Resolve effective address based on addressing mode
   switch (instr.mode) {
     case AM_ACCUMULATOR:
     case AM_IMPLIED:
@@ -143,22 +143,22 @@ void cpu_cycle(cpu* cpu) {
       cpu->register_y);
 #endif
 
-  /* Execute */
+  // Execute
   uint16_t last_program_counter = cpu->program_counter;
   cpu->program_counter += bytes_used;
   instr.implementation(cpu, address);
 
   cpu->addressing_special = false;
 
-  /* Trap detection */
+  // Trap detection
   if (cpu->program_counter == last_program_counter) {
     printf("!!! CPU TRAPPED !!!\n");
     dbg_print_state(cpu);
     exit(EXIT_FAILURE);
   }
 
-/* --------- TODO REMOVE: INTERRUPT TESTING --------- */
-/* Interrupt feedback triggering */
+// --------- TODO REMOVE: INTERRUPT TESTING ---------
+// Interrupt feedback triggering
 #define FEEDBACK_PORT 0xbffc
   uint8_t feedback_port = cpu_mem_read8(cpu, FEEDBACK_PORT);
 #define IRQ_MASK 0x1
@@ -181,7 +181,7 @@ void cpu_cycle(cpu* cpu) {
 #undef IRQ_MASK
 #undef NMI_MASK
 #undef FEEDBACK_PORT
-  /* --------- TODO REMOVE: INTERRUPT TESTING --------- */
+  // --------- TODO REMOVE: INTERRUPT TESTING ---------
 }
 
 /* Utilities */
@@ -209,7 +209,7 @@ uint16_t cpu_mem_read16_bug(cpu* cpu, uint16_t address) {
     return (((uint16_t)cpu_mem_read8(cpu, wrapped_address)) << 8) |
            ((uint16_t)cpu_mem_read8(cpu, address));
   } else {
-    /* If we don't cross a page, then this behaves like normal */
+    // If we don't cross a page, then this behaves like normal
     return cpu_mem_read16(cpu, address);
   }
 }
@@ -230,8 +230,8 @@ uint16_t pop16(cpu* cpu) {
 }
 
 void push16(cpu* cpu, uint16_t value) {
-  push8(cpu, (value >> 8) & 0xFF); /* High byte */
-  push8(cpu, value & 0xFF);        /* Low byte */
+  push8(cpu, (value >> 8) & 0xFF);  // High byte
+  push8(cpu, value & 0xFF);         // Low byte
 }
 
 bool is_page_crossed(uint16_t address1, uint16_t address2) {
@@ -249,15 +249,15 @@ void cpu_interrupt(cpu* cpu, interrupt_type type) {
   }
 
   if (cpu->register_status.flags.i && type == INTRT_IRQ) {
-    return; /* Don't set interrupt if disabled */
+    return;  // Don't set interrupt if disabled
   }
 
   if (cpu->last_interrupt == INTRT_NMI) {
-    /* Don't service interrupts if NMI is triggered */
+    // Don't service interrupts if NMI is triggered
     return;
   }
 
-  /* Perform all other interrupts later */
+  // Perform all other interrupts later
   cpu->last_interrupt = type;
 }
 
@@ -275,7 +275,7 @@ void perform_nmi(cpu* cpu) {
   cpu->program_counter = cpu_mem_read16(cpu, IV_NMI);
 }
 
-/* Common to instructions */
+// Common to instructions
 void cpu_implcommon_set_zs(cpu* cpu, uint8_t value) {
   cpu->register_status.flags.z = value == 0 ? 1 : 0;
   cpu->register_status.flags.s = value >> 7 & 0x1;
@@ -301,7 +301,7 @@ void cpu_implcommon_adc(cpu* cpu, uint16_t address, bool subtract) {
   cpu_implcommon_set_zs(cpu, cpu->register_a);
 }
 
-/* Implementation of instructions */
+// Implementation of instructions
 // Add with carry
 void cpu_impl_adc(cpu* cpu, uint16_t address) {
   cpu_implcommon_adc(cpu, address, false);
@@ -316,11 +316,11 @@ void cpu_impl_and(cpu* cpu, uint16_t address) {
 // Arithmetic shift left
 void cpu_impl_asl(cpu* cpu, uint16_t address) {
   uint8_t result;
-  /* Either accumulator OR memory */
+  // Either accumulator OR memory
   if (cpu->addressing_special) {
-    /* We are dealing with the accumulator */
+    // We are dealing with the accumulator
 
-    /* Set the carry bit to the old bit 7 */
+    // Set the carry bit to the old bit 7
     cpu->register_status.flags.c = cpu->register_a >> 7 & 0x1;
 
     cpu->register_a <<= 1;
@@ -328,7 +328,7 @@ void cpu_impl_asl(cpu* cpu, uint16_t address) {
   } else {
     uint8_t value = cpu_mem_read8(cpu, address);
 
-    /* Set the carry bit to the old bit 7 */
+    // Set the carry bit to the old bit 7
     cpu->register_status.flags.c = value >> 7 & 0x1;
 
     result = value << 1;
@@ -394,7 +394,7 @@ void cpu_impl_brk(cpu* cpu, uint16_t address) {
   push8(cpu, cpu->register_status.raw | BREAK_MASK);
   cpu->program_counter = cpu_mem_read16(cpu, IV_IRQ_BRK);
 
-  /* Disable interrupts */
+  // Disable interrupts
   cpu->register_status.flags.i = 1;
 }
 
@@ -535,11 +535,11 @@ void cpu_impl_ldy(cpu* cpu, uint16_t address) {
 // Logical shift right
 void cpu_impl_lsr(cpu* cpu, uint16_t address) {
   uint8_t result;
-  /* Either accumulator OR memory */
+  // Either accumulator OR memory
   if (cpu->addressing_special) {
-    /* We are dealing with the accumulator */
+    // We are dealing with the accumulator
 
-    /* Set the carry bit to the old bit 0 */
+    // Set the carry bit to the old bit 0
     cpu->register_status.flags.c = cpu->register_a & 0x1;
 
     cpu->register_a >>= 1;
@@ -547,7 +547,7 @@ void cpu_impl_lsr(cpu* cpu, uint16_t address) {
   } else {
     uint8_t value = cpu_mem_read8(cpu, address);
 
-    /* Set the carry bit to the old bit 0 */
+    // Set the carry bit to the old bit 0
     cpu->register_status.flags.c = value & 0x1;
 
     result = value >> 1;
@@ -583,7 +583,7 @@ void cpu_impl_pla(cpu* cpu, uint16_t address) {
 // Pop processor status
 void cpu_impl_plp(cpu* cpu, uint16_t address) {
   cpu->register_status.raw = pop8(cpu);
-  /* Set the unused bit & unset bcd mode */
+  // Set the unused bit & unset bcd mode
   cpu->register_status.raw |= STATUS_DEFAULT;
 }
 
@@ -591,7 +591,7 @@ void cpu_impl_plp(cpu* cpu, uint16_t address) {
 void cpu_impl_rol(cpu* cpu, uint16_t address) {
   uint8_t value;
   if (cpu->addressing_special) {
-    /* We're dealing with the accumulator */
+    // We're dealing with the accumulator
     value = cpu->register_a;
   } else {
     value = cpu_mem_read8(cpu, address);
@@ -599,12 +599,12 @@ void cpu_impl_rol(cpu* cpu, uint16_t address) {
 
   uint8_t old_bit_7 = value >> 7 & 0x1;
   value <<= 1;
-  /* Bit 0 is filled with the current value of the carry flag */
+  // Bit 0 is filled with the current value of the carry flag
   value |= cpu->register_status.flags.c;
   cpu->register_status.flags.c = old_bit_7;
 
   if (cpu->addressing_special) {
-    /* We're dealing with the accumulator */
+    // We're dealing with the accumulator
     cpu->register_a = value;
   } else {
     cpu_mem_write8(cpu, address, value);
@@ -616,9 +616,9 @@ void cpu_impl_rol(cpu* cpu, uint16_t address) {
 // Rotate right
 void cpu_impl_ror(cpu* cpu, uint16_t address) {
   uint8_t value;
-  /* Either accumulator OR memory */
+  // Either accumulator OR memory
   if (cpu->addressing_special) {
-    /* We are dealing with the accumulator */
+    // We are dealing with the accumulator
     value = cpu->register_a;
   } else {
     value = cpu_mem_read8(cpu, address);
@@ -626,12 +626,12 @@ void cpu_impl_ror(cpu* cpu, uint16_t address) {
 
   uint8_t old_bit_0 = value & 0x1;
   value >>= 1;
-  /* Bit 7 is filled with the current value of the carry flag */
+  // Bit 7 is filled with the current value of the carry flag
   value |= cpu->register_status.flags.c << 7;
   cpu->register_status.flags.c = old_bit_0;
 
   if (cpu->addressing_special) {
-    /* We're dealing with the accumulator */
+    // We're dealing with the accumulator
     cpu->register_a = value;
   } else {
     cpu_mem_write8(cpu, address, value);
@@ -721,7 +721,7 @@ void cpu_impl_tya(cpu* cpu, uint16_t address) {
   cpu_implcommon_set_zs(cpu, cpu->register_a);
 }
 
-/* Constants */
+// Constants
 #define NULL_INSTRUCTION \
   { .mode = AM_ACCUMULATOR, .mnemonic = "###", .implementation = NULL }
 const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS] = {
@@ -1061,7 +1061,7 @@ const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS] = {
 
 #undef NULL_INSTRUCTION
 
-/* Debugging utils */
+// Debugging utils
 const char* dbg_address_mode_to_string(address_mode mode) {
   switch (mode) {
     case AM_ACCUMULATOR:
