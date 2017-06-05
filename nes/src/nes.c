@@ -9,13 +9,14 @@ int main(int argc, char** argv) {
   }
 
   cpu* cpu = cpu_init();
+  cpu->program_counter = 0x400;
 
   /* Read image into memory */
   FILE* fp = fopen(argv[1], "r");
   fseek(fp, 0, SEEK_END);
   size_t size = ftell(fp);
   fseek(fp, 0, SEEK_SET);
-  fread(cpu->memory, 1, size, fp);
+  fread(cpu->memory + cpu->program_counter, 1, size, fp);
   fclose(fp);
   /* - */
 

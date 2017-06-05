@@ -9,7 +9,7 @@
 #define IV_RESET 0xFFFC
 #define IV_IRQ_BRK 0xFFFE
 
-// #define DEBUG 1
+#define DEBUG 1
 
 cpu* cpu_init() {
   cpu* cpu = calloc(1, sizeof(cpu));
@@ -17,6 +17,10 @@ cpu* cpu_init() {
   cpu->register_status.raw = STATUS_DEFAULT;
   cpu->stack_pointer = STACK_DEFAULT;
   cpu->last_interrupt = INTRT_NONE;
+
+  // Reset on power on (not done for tests)
+  // cpu_interrupt(cpu, INTRT_RESET);
+
   return cpu;
 }
 
@@ -35,7 +39,7 @@ void perform_irq(cpu* cpu);
 void perform_nmi(cpu* cpu);
 
 void cpu_cycle(cpu* cpu) {
-  /* Handle interrupts (work in progress) */
+  /* Handle interrupts */
   switch (cpu->last_interrupt) {
     case INTRT_IRQ:
       perform_irq(cpu);
@@ -144,6 +148,8 @@ void cpu_cycle(cpu* cpu) {
   cpu->program_counter += bytes_used;
   instr.implementation(cpu, address);
 
+  cpu->addressing_special = false;
+
   /* Trap detection */
   if (cpu->program_counter == last_program_counter) {
     printf("!!! CPU TRAPPED !!!\n");
@@ -151,7 +157,31 @@ void cpu_cycle(cpu* cpu) {
     exit(EXIT_FAILURE);
   }
 
-  cpu->addressing_special = false;
+/* --------- TODO REMOVE: INTERRUPT TESTING --------- */
+/* Interrupt feedback triggering */
+#define FEEDBACK_PORT 0xbffc
+  uint8_t feedback_port = cpu_mem_read8(cpu, FEEDBACK_PORT);
+#define IRQ_MASK 0x1
+#define NMI_MASK 0x2
+
+  if ((feedback_port & NMI_MASK) == NMI_MASK) {
+    feedback_port &= ~NMI_MASK;
+    printf("Triggered NMI\n");
+    cpu_interrupt(cpu, INTRT_NMI);
+  }
+
+  if ((feedback_port & IRQ_MASK) == IRQ_MASK) {
+    feedback_port &= ~IRQ_MASK;
+    printf("Triggered IRQ\n");
+    cpu_interrupt(cpu, INTRT_IRQ);
+  }
+
+  cpu_mem_write8(cpu, FEEDBACK_PORT, feedback_port);
+
+#undef IRQ_MASK
+#undef NMI_MASK
+#undef FEEDBACK_PORT
+  /* --------- TODO REMOVE: INTERRUPT TESTING --------- */
 }
 
 /* Utilities */
@@ -220,6 +250,11 @@ void cpu_interrupt(cpu* cpu, interrupt_type type) {
 
   if (cpu->register_status.flags.i && type == INTRT_IRQ) {
     return; /* Don't set interrupt if disabled */
+  }
+
+  if (cpu->last_interrupt == INTRT_NMI) {
+    /* Don't service interrupts if NMI is triggered */
+    return;
   }
 
   /* Perform all other interrupts later */
@@ -1074,5 +1109,9 @@ void dbg_print_state(cpu* cpu) {
          cpu->register_status.raw >> 5 & 0x1, cpu->register_status.flags.b,
          cpu->register_status.flags.d, cpu->register_status.flags.i,
          cpu->register_status.flags.z, cpu->register_status.flags.c);
+  printf(" --> Stack\n");
+  for (uint16_t i = cpu->stack_pointer + 1; i <= 0xFF; i++) {
+    printf(" 0x%02x: 0x%02x\n", i, cpu_mem_read8(cpu, STACK_PAGE | i));
+  }
   printf("-----------------------\n");
 }
