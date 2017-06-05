@@ -76,8 +76,7 @@ typedef struct {
   } status;
   uint8_t oam_address;
   uint8_t oam_data;
-  
-  uint8_t address;
+
   uint8_t data;
 
   uint8_t memory[PPU_MEMORY];
@@ -87,6 +86,8 @@ typedef struct {
   uint16_t scanline;
   bool frame_odd;
 
+  uint32_t ignore_writes;
+
   // Internal registers
   scroll_reg v;
   scroll_reg t;
@@ -94,11 +95,14 @@ typedef struct {
   bool w;
 } ppu;
 
+void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value);
+uint8_t ppu_mem_read(ppu* ppu, uint16_t address);
+
+void ppu_reset(ppu* ppu);
+void ppu_power(ppu* ppu);
+
 ppu* ppu_init(void);
 
 void ppu_cycle(ppu* ppu);
-
-void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value);
-uint8_t ppu_mem_read(ppu* ppu, uint16_t address);
 
 void ppu_deinit(ppu* ppu);

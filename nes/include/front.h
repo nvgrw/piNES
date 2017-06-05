@@ -33,9 +33,9 @@ typedef struct front {
   char* name;
 
   // Implementation-specific
+  void (*run)(void*);
+  void (*deinit)(void*);
   void* impl;
-  void (*run)(struct front* front);
-  void (*deinit)(struct front* front);
 } front;
 
 /**

@@ -23,3 +23,5 @@ typedef struct {
  * Creates an instance of an SDL front.
  */
 int front_sdl_init(front* front);
+
+void front_sdl_run(void* front);

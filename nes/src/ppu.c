@@ -7,11 +7,105 @@
  * ppu.c
  */
 
-ppu* ppu_init(void) {
-  ppu* ppu = malloc(sizeof(ppu));
+void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value) {
+  if (ppu->ignore_writes) {
+    switch (address) {
+      case 0x2000:
+      case 0x2001:
+      case 0x2005:
+      case 0x2006:
+        return;
+    }
+  }
+
+  switch (address) {
+    case 0x2000:
+      ppu->ctrl.raw = value;
+      break;
+    case 0x2001:
+      ppu->mask.raw = value;
+      break;
+    case 0x2003:
+      ppu->oam_address = value;
+      break;
+    case 0x2004:
+      ppu->oam_data = value;
+      break;
+    case 0x2005:
+      if (!ppu->w) {
+        ppu->t.scroll.x_coarse = value >> 3;
+        ppu->x = value & 0x7;
+      } else {
+        ppu->t.scroll.y_coarse = value >> 3;
+        ppu->t.scroll.y_fine = value;
+      }
+      ppu->w = !ppu->w;
+      break;
+    case 0x2006:
+      if (!ppu->w) {
+        ppu->t.raw = (ppu->t.raw & 0xFF) | ((value & 0x3F) << 8);
+      } else {
+        ppu->t.raw = (ppu->t.raw & 0x7FFF) | value;
+      }
+      ppu->w = !ppu->w;
+      break;
+    case 0x2007:
+      // TODO: increment according to 0x2000 : 2
+      break;
+    case 0x4014:
+      // TODO: OAM write from CPU to PPU
+      break;
+  }
+}
+
+uint8_t ppu_mem_read(ppu* ppu, uint16_t address) {
+  switch (address) {
+    case 0x2002:
+      ppu->w = false;
+      return ppu->status.raw;
+    case 0x2003:
+      return ppu->oam_address;
+    case 0x2004:
+      return ppu->oam_data;
+    case 0x2007:
+      // TODO: maybe increment?
+      return ppu->data;
+  }
+  return 0;
+}
+
+void ppu_reset(ppu* ppu) {
+  ppu->ctrl.raw = 0;
+  ppu->mask.raw = 0;
+  ppu->status.raw = (ppu->status.raw & 0x80);
+  // oam address unchanged
+  ppu->w = false;
+  ppu_mem_write(ppu, 0x2005, 0);
+  ppu_mem_write(ppu, 0x2005, 0);
+  // ppu->data = 0; // TODO: read buffer set to 0
+  ppu->frame_odd = false;
+  // TODO: oam set to pattern
+
+  // Top of the picture
   ppu->cycle = 0;
   ppu->scanline = PPU_SL_PRERENDER;
-  ppu->frame_odd = false;
+
+  ppu->ignore_writes = 29658 * 3;
+}
+
+void ppu_power(ppu* ppu) {
+  // http://wiki.nesdev.com/w/index.php/PPU_power_up_state
+  ppu_reset(ppu);
+  ppu->status.raw = 0xA0;
+  ppu->oam_address = 0;
+  // ppu->v.raw = 0;
+  ppu->t.raw = 0;
+  ppu->x = 0;
+}
+
+ppu* ppu_init(void) {
+  ppu* ppu = malloc(sizeof(ppu));
+  ppu_power(ppu);
   return ppu;
 }
 
@@ -32,6 +126,10 @@ void ppu_cycle_bg_high(ppu* ppu) {
 }
 
 void ppu_cycle(ppu* ppu) {
+  if (ppu->ignore_writes > 0) {
+    ppu->ignore_writes--;
+  }
+
   // Special operations
   switch (ppu->scanline) {
     case 0:
@@ -113,7 +211,8 @@ void ppu_cycle(ppu* ppu) {
       ppu->v.scroll.ny = ppu->t.scroll.ny;
       ppu->v.scroll.y_fine = ppu->t.scroll.y_fine;
     }
-    if (ppu->cycle >= 328 || ppu->cycle <= 256) {
+    if ((ppu->cycle >= 328 || ppu->cycle <= 256) &&
+        ppu->cycle % 8 == 0 && ppu->cycle != 0) {
       // Increment hori(v)
       if (ppu->v.scroll.x_coarse < 31) {
         ppu->v.scroll.x_coarse++;
@@ -134,63 +233,6 @@ void ppu_cycle(ppu* ppu) {
       ppu->frame_odd = !ppu->frame_odd;
     }
   }
-}
-
-void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value) {
-  switch (address) {
-    case 0x2000:
-      ppu->ctrl.raw = value;
-      break;
-    case 0x2001:
-      ppu->mask.raw = value;
-      break;
-    case 0x2003:
-      ppu->oam_address = value;
-      break;
-    case 0x2004:
-      ppu->oam_data = value;
-      break;
-    case 0x2005:
-      if (!ppu->w) {
-        ppu->t.scroll.x_coarse = value >> 3;
-        ppu->x = value & 0x7;
-      } else {
-        ppu->t.scroll.y_coarse = value >> 3;
-        ppu->t.scroll.y_fine = value;
-      }
-      ppu->w = !ppu->w;
-      break;
-    case 0x2006:
-      if (!ppu->w) {
-        ppu->t.raw = (ppu->t.raw & 0xFF) | ((value & 0x3F) << 8);
-      } else {
-        ppu->t.raw = (ppu->t.raw & 0x7FFF) | value;
-      }
-      ppu->w = !ppu->w;
-      break;
-    case 0x2007:
-      // TODO: increment according to 0x2000 : 2
-      break;
-    case 0x4014:
-      // TODO: OAM write from CPU to PPU
-      break;
-  }
-}
-
-uint8_t ppu_mem_read(ppu* ppu, uint16_t address) {
-  switch (address) {
-    case 0x2002:
-      ppu->w = false;
-      return ppu->status.raw;
-    case 0x2003:
-      return ppu->oam_address;
-    case 0x2004:
-      return ppu->oam_data;
-    case 0x2007:
-      // TODO: maybe increment?
-      return ppu->data;
-  }
-  return 0;
 }
 
 void ppu_deinit(ppu* ppu) {
