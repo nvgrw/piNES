@@ -156,32 +156,6 @@ void cpu_cycle(cpu* cpu) {
     dbg_print_state(cpu);
     exit(EXIT_FAILURE);
   }
-
-// --------- TODO REMOVE: INTERRUPT TESTING ---------
-// Interrupt feedback triggering
-#define FEEDBACK_PORT 0xbffc
-  uint8_t feedback_port = cpu_mem_read8(cpu, FEEDBACK_PORT);
-#define IRQ_MASK 0x1
-#define NMI_MASK 0x2
-
-  if ((feedback_port & NMI_MASK) == NMI_MASK) {
-    feedback_port &= ~NMI_MASK;
-    printf("Triggered NMI\n");
-    cpu_interrupt(cpu, INTRT_NMI);
-  }
-
-  if ((feedback_port & IRQ_MASK) == IRQ_MASK) {
-    feedback_port &= ~IRQ_MASK;
-    printf("Triggered IRQ\n");
-    cpu_interrupt(cpu, INTRT_IRQ);
-  }
-
-  cpu_mem_write8(cpu, FEEDBACK_PORT, feedback_port);
-
-#undef IRQ_MASK
-#undef NMI_MASK
-#undef FEEDBACK_PORT
-  // --------- TODO REMOVE: INTERRUPT TESTING ---------
 }
 
 /* Utilities */
