@@ -191,3 +191,10 @@ uint8_t apu_pulses_output(apu* apu);
 /**
  * APU mixer methods
  */
+
+
+ /**
+  * General output methods
+  */
+
+uint8_t apu_output(apu* apu);

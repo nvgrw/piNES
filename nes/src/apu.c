@@ -38,4 +38,10 @@ uint8_t apu_tnd_output(apu* apu) {
   return 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
 }
 
+uint8_t apu_output(apu* apu) {
+  uint8_t pulse = apu_pulses_output(apu);
+  uint8_t tnd = apu_tnd_output(apu);
+  return pulse + tnd;
+}
+
 apu* apu_init(void) { return (apu*)calloc(1, sizeof(apu)); }
