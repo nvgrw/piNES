@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "sys.h"
+
 /**
  * front.h
  * 
@@ -24,29 +26,20 @@ typedef enum {
 /**
  * The front struct, common to all implementations.
  */
-typedef struct front {
+typedef struct {
+  // System
+  sys* sys;
+
   // UI properties
   front_tab tab;
   uint8_t scale;
-
-  // Implementation metadata
-  char* name;
-
-  // Implementation-specific
-  void (*run)(void*);
-  void (*deinit)(void*);
-  void* impl;
 } front;
 
 /**
  * Shows a system-dependent dialog to select a ROM file.
  */
-int front_rom_dialog(char* path);
+char* front_rom_dialog(void);
 
-front* front_init(void);
+front* front_init(sys* sys);
 
-/**
- * Helper functions to call implementation-specific functions.
- */
-void front_run(front* front);
 void front_deinit(front* front);
