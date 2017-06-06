@@ -14,3 +14,9 @@ bool apu_mem_is_valid(uint16_t address) {
 }
 
 uint16_t apu_mem_translate(uint16_t address) { return address; }
+
+bool apu_mem_read8(apu* apu, uint16_t address);
+void apu_mem_read16(apu* apu, uint16_t address);
+uint16_t apu_mem_translate(uint16_t address);
+
+apu* apu_init(void) { return (apu*)calloc(1, sizeof(apu)); }

@@ -38,7 +38,7 @@ typedef union {
     } reg4;
   } regs;
 
-  uint8_t regs_raw[4];
+  uint8_t regs_raw;
 } pulse_channel;
 
 typedef union {
@@ -60,7 +60,7 @@ typedef union {
 
   } regs;
 
-  uint8_t regs_raw[3];
+  uint8_t regs_raw;
 } triangle_channel;
 
 typedef union {
@@ -84,7 +84,7 @@ typedef union {
     } reg3;
   } regs;
 
-  uint8_t regs_raw[3];
+  uint8_t regs_raw;
 } noise_channel;
 
 typedef union {
@@ -106,7 +106,7 @@ typedef union {
     } reg3;
 
   } regs;
-  uint8_t regs_raw[3];
+  uint8_t regs_raw;
 } dmc_channel;
 
 typedef struct {
@@ -164,8 +164,6 @@ apu* apu_init(void);
  */
 
 bool apu_mem_is_valid(uint16_t address);
-bool apu_mem_read8(apu* apu, uint16_t address);
-void apu_mem_read16(apu* apu, uint16_t address);
 uint16_t apu_mem_translate(uint16_t address);
 
 /**
