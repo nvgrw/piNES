@@ -13,4 +13,4 @@ bool apu_mem_is_valid(uint16_t address) {
          translated_address == STATUS || translated_address == FRAME_COUNTER;
 }
 
-uint16_t apu_mem_translate(uint16_t address) { return -1; }
+uint16_t apu_mem_translate(uint16_t address) { return address; }
