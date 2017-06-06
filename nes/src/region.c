@@ -4,22 +4,12 @@
  * region.c
  */
 
-static region region_current = R_NTSC;
-
-void region_set_current(region region) {
-  region_current = region;
-}
-
-region region_get_current(void) {
-  return region_current;
-}
-
-uint32_t region_screen_width(void) {
+uint32_t region_screen_width(region region) {
   return 256;
 }
 
-uint32_t region_screen_height(void) {
-  switch (region_current) {
+uint32_t region_screen_height(region region) {
+  switch (region) {
     case R_NTSC:
     case R_RGB3:
     case R_RGB4:

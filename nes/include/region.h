@@ -21,13 +21,7 @@ typedef enum {
 } region;
 
 /**
- * Set / get the current region. Used to make region accessible in any file.
- */
-void region_set_current(region region);
-region region_get_current(void);
-
-/**
  * Returns the screen size appropriate for the set region.
  */
-uint32_t region_screen_width(void);
-uint32_t region_screen_height(void);
+uint32_t region_screen_width(region region);
+uint32_t region_screen_height(region region);
