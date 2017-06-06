@@ -15,8 +15,27 @@ bool apu_mem_is_valid(uint16_t address) {
 
 uint16_t apu_mem_translate(uint16_t address) { return address; }
 
-bool apu_mem_read8(apu* apu, uint16_t address);
-void apu_mem_read16(apu* apu, uint16_t address);
-uint16_t apu_mem_translate(uint16_t address);
+uint8_t apu_pulse0_output(apu* apu) { return -1; }
+
+uint8_t apu_pulse1_output(apu* apu) { return -1; }
+
+/* this farmulae are linear approximations */
+
+uint8_t apu_pulses_output(apu* apu) {
+  uint8_t pulse0 = apu_pulse0_output(apu);
+  uint8_t pulse1 = apu_pulse1_output(apu);
+  return 0.00752 * (pulse0 + pulse1);
+}
+
+uint8_t apu_triangle_output(apu* apu) { return -1; }
+uint8_t apu_noise_output(apu* apu) { return -1; }
+uint8_t apu_dmc_output(apu* apuc) { return -1; }
+
+uint8_t apu_tnd_output(apu* apu) {
+  uint8_t triangle = apu_triangle_output(apu);
+  uint8_t noise = apu_noise_output(apu);
+  uint8_t dmc = apu_dmc_output(apu);
+  return 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
+}
 
 apu* apu_init(void) { return (apu*)calloc(1, sizeof(apu)); }

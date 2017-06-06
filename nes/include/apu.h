@@ -158,7 +158,6 @@ typedef struct {
  */
 apu* apu_init(void);
 
-
 /**
  * Memory acces utility functions
  */
@@ -167,7 +166,28 @@ bool apu_mem_is_valid(uint16_t address);
 uint16_t apu_mem_translate(uint16_t address);
 
 /**
- * Register access utility functions
+ *  DMC methods
  */
 
- void apu_reg_read(apu* apu, uint8_t num);
+ uint8_t apu_dmc_output(apu* apuc);
+
+/**
+ * Pulse methods
+ */
+
+uint8_t apu_pulse0_output(apu* apu);
+uint8_t apu_pulse1_output(apu* apu);
+uint8_t apu_pulses_output(apu* apu);
+
+/**
+ * Triangle methods
+ */
+ uint8_t apu_triangle_output(apu* apu);
+/**
+ * Noise methods
+ */
+
+ uint8_t apu_noise_output(apu* apu);
+/**
+ * APU mixer methods
+ */
