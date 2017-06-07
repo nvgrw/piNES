@@ -30,8 +30,7 @@ typedef struct {
   uint8_t right : 1;
 } controller_state;
 
-controller_state poll_controller(void) {
-  controller_state state;
+void poll_controllers(controller_state* cntrl_1_state, controller_state* cntrl_2_state) {
   
   // Set latch for 12us
   gpioWrite(18, 1);
@@ -39,52 +38,61 @@ controller_state poll_controller(void) {
   gpioWrite(18, 0);
   
   // Poll A
-  state.a = !gpioRead(17);
+  cntrl_1_state->a = !gpioRead(17); 
+  cntrl_2_state->a = !gpioRead(22); 
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll B
   pulse();
-  state.b = !gpioRead(17);
+  cntrl_1_state->b = !gpioRead(17);
+  cntrl_2_state->b = !gpioRead(22); 
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll SELECT
   pulse();
-  state.select = !gpioRead(17);
+  cntrl_1_state->select = !gpioRead(17);
+  cntrl_2_state->select = !gpioRead(22); 
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll START
   pulse();
-  state.start = !gpioRead(17);
+  cntrl_1_state->start = !gpioRead(17);
+  cntrl_2_state->start = !gpioRead(22); 
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll UP
   pulse();
-  state.up = !gpioRead(17);
+  cntrl_1_state->up = !gpioRead(17);
+  cntrl_2_state->up = !gpioRead(22); 
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll DOWN
   pulse();
-  state.down = !gpioRead(17);
+  cntrl_1_state->down = !gpioRead(17);
+  cntrl_2_state->down = !gpioRead(22); 
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll LEFT
   pulse();
-  state.left = !gpioRead(17);
+  cntrl_1_state->left = !gpioRead(17);
+  cntrl_2_state->left = !gpioRead(22); 
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll RIGHT
   pulse();
-  state.right = !gpioRead(17);
+  cntrl_1_state->right = !gpioRead(17);
+  cntrl_2_state->right = !gpioRead(22); 
   gpioDelay(PULSE_HALF_CYCLE);
-  
-  return state;
 }
 
 void init_controller(void) {
   if (gpioInitialise() < 0) exit(1); 
  
-  // Pin 17: data
+  // Pin 17: cntrl_1 data
   gpioSetMode(17, PI_INPUT);
+  // Pin 22: cntrl_2 data
+  gpioSetMode(22, PI_INPUT);
+
   // Pin 18: latch
   gpioSetMode(18, PI_OUTPUT);
   // Pin 27: pulse
@@ -100,16 +108,23 @@ int main(int argc, char** argv) {
   gpioSetSignalFunc(SIGINT, sigIntHandler);
 
   while (running) {
-    controller_state state = poll_controller();
-    printf("A: %d, B: %d, SELECT: %d, START: %d, UP: %d, DOWN: %d, LEFT: %d,\
- RIGHT: %d\n", state.a, state.b, state.select, state.start, state.up,
-    state.down, state.left, state.right);
+    controller_state cntrl_1_state;
+    controller_state cntrl_2_state;
+    poll_controllers(&cntrl_1_state, &cntrl_2_state);
+
+    printf("CONTROLLER 1: A %d, B %d, SELECT %d, START %d, UP %d, DOWN %d, LEFT %d,\
+ RIGHT %d  ", cntrl_1_state.a, cntrl_1_state.b, cntrl_1_state.select, cntrl_1_state.start, cntrl_1_state.up,
+    cntrl_1_state.down, cntrl_1_state.left, cntrl_1_state.right);
+
+    printf("CONTROLLER 2: A %d, B %d, SELECT %d, START %d, UP %d, DOWN %d, LEFT %d,\
+ RIGHT %d \n", cntrl_2_state.a, cntrl_2_state.b, cntrl_2_state.select, cntrl_2_state.start, cntrl_2_state.up,
+    cntrl_2_state.down, cntrl_2_state.left, cntrl_2_state.right);
  
     gpioDelay(LATCH_WAIT);
 
     // system("clear");
   }
-  deinit_controller();
+   deinit_controller();
   return EXIT_SUCCESS;
 }
 
