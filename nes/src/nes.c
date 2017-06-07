@@ -1,25 +1,40 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <time.h>
 
-#include "cpu.h"
+#include "error.h"
+#include "front.h"
+#include "front_impl.h"
+#include "ppu.h"
+#include "region.h"
+#include "sys.h"
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    fprintf(stderr, "Please provide 1 argument. You provided %d.", argc - 1);
+  // Initialise the sys
+  sys* sys = sys_init();
+
+  // Initialise the front
+  front* front = front_init(sys);
+  if (front == NULL) {
+    fprintf(stderr, "Could not initialise front\n");
+    sys_deinit(sys);
+    return EXIT_FAILURE;
   }
 
-  cpu* cpu = cpu_init();
+  // Initialise the front implementation
+  front_impl* impl = front_impl_init(front);
+  if (impl == NULL) {
+    fprintf(stderr, "Could not initialise front implementation\n");
+    front_deinit(front);
+    sys_deinit(sys);
+    return EXIT_FAILURE;
+  }
 
-  /* Read image into memory */
-  FILE* fp = fopen(argv[1], "r");
-  fseek(fp, 0, SEEK_END);
-  size_t size = ftell(fp);
-  fseek(fp, 0, SEEK_SET);
-  fread(cpu->memory, 1, size, fp);
-  fclose(fp);
-  /* - */
+  // Enter main loop
+  front_impl_run(impl);
 
-  cpu_run(cpu);
-  cpu_deinit(cpu);
+  // Deinit everything, freeing memory
+  front_impl_deinit(impl);
+  front_deinit(front);
+  sys_deinit(sys);
   return EXIT_SUCCESS;
 }
