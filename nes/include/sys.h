@@ -12,6 +12,10 @@
 typedef struct {
   double clock;
   ppu* ppu;
+  // apu* apu;
+  // cpu* cpu;
+  // controller* ctrl1;
+  // controller* ctrl2;
   region region;
 } sys;
 

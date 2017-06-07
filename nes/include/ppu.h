@@ -145,6 +145,24 @@ typedef struct {
 
   // Sprite rendering
   uint8_t oam[256];
+  union {
+    struct {
+      uint8_t y : 8;
+      struct {
+        uint8_t bank : 1;
+        uint8_t tile : 7;
+      } index : 8;
+      struct {
+        uint8_t palette : 2;
+        uint8_t : 3;
+        uint8_t priority : 1;
+        uint8_t flip_h : 1;
+        uint8_t flip_v : 1;
+      } attr : 8;
+      uint8_t x : 8;
+    } sprites[8];
+    uint8_t raw[32];
+  } oam_secondary;
 
   // Visual output
   ppu_driver driver;
