@@ -69,17 +69,17 @@ typedef union {
       uint8_t env_per_or_volume : 4;
       uint8_t const_volume : 1;
       uint8_t loop_env_or_dis_len : 1;
-      uint8_t waste : 2;
+      uint8_t : 2;
     } reg1;
 
     struct {
       uint8_t noise_period : 2;
-      uint8_t waste : 3;
+      uint8_t : 3;
       uint8_t loop_noise : 1;
     } reg2;
 
     struct {
-      uint8_t waste : 3;
+      uint8_t : 3;
       uint8_t lenn_count_load : 5;
     } reg3;
   } regs;
@@ -91,14 +91,14 @@ typedef union {
   struct {
     struct {
       uint8_t freq_index : 4;
-      uint8_t waste : 2;
+      uint8_t : 2;
       uint8_t loop_sample : 1;
       uint8_t irq_enable : 1;
     } reg1;
 
     struct {
       uint8_t direct_load : 7;
-      uint8_t waste : 1;
+      uint8_t : 1;
     } reg2;
 
     struct {
@@ -134,7 +134,7 @@ typedef union {
 
 typedef union {
   struct {
-    uint8_t waste : 6;
+    uint8_t : 6;
     uint8_t disable_frame : 1;
     uint8_t frame5_sequence : 1;
   } fields;
