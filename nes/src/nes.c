@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 #include "cpu.h"
-#include "loader.h"
+#include "rom.h"
 
 int main(int argc, char** argv) {
   if (argc != 2) {
@@ -10,7 +10,8 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  rom_error error = rom_load(NULL, argv[1]);
+  mapper* mapper = NULL;
+  rom_error error = rom_load(&mapper, argv[1]);
   printf("Error code: %d\n", error);
 
   return EXIT_SUCCESS;

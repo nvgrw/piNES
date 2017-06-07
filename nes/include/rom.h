@@ -1,18 +1,23 @@
 #pragma once
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 
 #define WORK_RAM_SIZE 0x800
-#define PPU_CTRL_REGISTERS_SIZE 8
 #define REGISTERS_SIZE 0x20
 #define CART_EXPANSION_ROM_SIZE 0x1FDF
 #define SRAM_SIZE 0x2000
-#define PRG_ROM_SIZE 0x8000
 #define PPU_TABLES_SIZE 0x3000
 #define PPU_PALETTES_SIZE 0x20
 
-typedef enum { RE_SUCCESS, RE_READ_ERROR, RE_INVALID_FILE_FORMAT } rom_error;
+typedef enum {
+  RE_SUCCESS,
+  RE_READ_ERROR,
+  RE_INVALID_FILE_FORMAT,
+  RE_PRG_READ_ERROR,
+  RE_CHR_READ_ERROR
+} rom_error;
 
 typedef enum { ROMTYPE_ARCHAIC, ROMTYPE_INES, ROMTYPE_NES2 } rom_type;
 
@@ -69,7 +74,7 @@ typedef struct __attribute__((packed)) {
     } nes1;  // Flags9 is typically ignored
     struct {
       uint8_t prg_rom_additional : 4;  // Additional bits for PRG ROM size
-      uint8_t chr_rom_additional : 4;  // Additoinal bits for CHR ROM size
+      uint8_t chr_rom_additional : 4;  // Additional bits for CHR ROM size
     } nes2;
     uint8_t raw;
   } flags9;
@@ -113,25 +118,40 @@ typedef struct __attribute__((packed)) {
   uint8_t : 8;
 } rom_header;
 
+// https://en.wikibooks.org/wiki/NES_Programming/Memory_Map
 typedef struct {
+  // CPU
   uint8_t ram[WORK_RAM_SIZE];
-  uint8_t ppu_ctrl_regs[PPU_CTRL_REGISTERS_SIZE];
   uint8_t registers[REGISTERS_SIZE];
-  uint8_t expansion_rom[CART_EXPANSION_ROM_SIZE];
-  uint8_t sram[SRAM_SIZE];
-  uint8_t prg_rom[PRG_ROM_SIZE];
-} cpu_memory;
+  uint8_t* prg_rom;
+  uint8_t* prg_ram;  // NULL if not present
 
-typedef struct {
-  uint8_t tables[PPU_TABLES_SIZE];
-  uint8_t palettes[PPU_PALETTES_SIZE];
-} ppu_memory;
+  // PPU
+  uint8_t* chr_rom;  // NULL if not present
+  uint8_t* chr_ram;  // NULL if not present
+} memory;
 
 typedef struct {
   rom_header* header;
   rom_type type;
-  cpu_memory* cpu_memory;
-  ppu_memory* ppu_memory;
+  // Actual struct storing the data
+  memory* memory;
+  // An indirection struct which the mapper manipulates e.g. for bank switching
+  struct {
+    uint8_t* ram;
+    uint8_t* ppu_ctrl_regs;
+    uint8_t* registers;
+    uint8_t* cart_expansion_rom;
+    uint8_t* sram;
+    uint8_t* prg_rom1;
+    uint8_t* prg_rom2;
+
+    uint8_t* ppu_pattable0;
+    uint8_t* ppu_pattable1;
+    uint8_t* ppu_nametable0;
+    uint8_t* ppu_nametable1;
+    uint8_t* ppu_palettes;
+  } mapped;
 } mapper;
 
 /*
@@ -171,3 +191,27 @@ uint32_t rom_get_mapper_number(mapper* mapper);
  * not determinable then we default to NTSC.
  */
 video_mode rom_get_video_mode(mapper* mapper);
+
+bool rom_has_persistent_memory(mapper* mapper);
+
+bool rom_has_bus_conflicts(mapper* mapper);
+
+/**
+ * CPU writes
+ */
+void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val);
+
+/**
+ * CPU reads
+ */
+uint8_t mmap_cpu_read(mapper* mapper, uint16_t address);
+
+/**
+ * CHR ROM/RAM writes
+ */
+void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val);
+
+/**
+ * CHR ROM/RAM reads
+ */
+uint8_t mmap_ppu_read(mapper* mapper, uint16_t address);
