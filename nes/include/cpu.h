@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/**
+ * cpu.h
+ * 
+ * CPU struct and functions.
+ */
+
 #define MEMORY_SIZE 0x10000
 #define STACK_PAGE 0x100
 #define STACK_DEFAULT 0xFF
@@ -53,16 +59,16 @@ typedef struct {
   uint8_t* memory;
 
   // Misc
-  bool halt;
+  bool trap;
   bool addressing_special;
+  bool branch_taken;
   interrupt_type last_interrupt;
 } cpu;
 
 // Functions
 cpu* cpu_init();
 void cpu_deinit(cpu* cpu);
-void cpu_run(cpu* cpu);
-void cpu_cycle(cpu* cpu);
+uint8_t cpu_cycle(cpu* cpu);
 
 // Utilities
 uint8_t cpu_mem_read8(cpu* cpu, uint16_t address);
@@ -118,6 +124,9 @@ typedef struct {
   address_mode mode;
   char* mnemonic;
   void (*implementation)(cpu* cpu, uint16_t address);
+  uint8_t cycles;
+  bool cycle_cross;
+  bool cycle_branch;
 } instruction;
 
 extern const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS];

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stdbool.h>
+
+#include "cpu.h"
 #include "ppu.h"
 #include "region.h"
 
@@ -11,16 +14,20 @@
 
 typedef struct {
   double clock;
+  cpu* cpu;
   ppu* ppu;
   // apu* apu;
-  // cpu* cpu;
   // controller* ctrl1;
   // controller* ctrl2;
   region region;
+
+  bool running;
 } sys;
 
 sys* sys_init(void);
 
 void sys_run(sys* sys, uint32_t ms);
+
+void sys_test(sys* sys);
 
 void sys_deinit(sys* sys);

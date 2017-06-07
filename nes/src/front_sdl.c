@@ -14,6 +14,19 @@
 
 #define dbg(X) printf(X "\n");
 
+#define BUTTON_LOAD 0
+#define BUTTON_RUN 1
+#define BUTTON_STOP 2
+#define BUTTON_PAUSE 3
+#define BUTTON_STEP 4
+#define BUTTON_CPU 5
+#define BUTTON_PPU 6
+#define BUTTON_APU 7
+#define BUTTON_IO 8
+#define BUTTON_TEST 9
+
+#define BUTTON_NUM 10
+
 /**
  * front_sdl.c
  */
@@ -48,16 +61,31 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
           break;
         case SDL_MOUSEBUTTONUP:
           impl->mouse_down = false;
-          if (impl->mouse_x >= 0 && impl->mouse_x < 8 * 16 + 16 &&
+          if (impl->mouse_x >= 0 && impl->mouse_x < 10 * 16 + 16 &&
               impl->mouse_y >= 0 && impl->mouse_y < 16) {
             switch (impl->mouse_x / 16) {
-              case 0: {
+              case BUTTON_LOAD: {
                 char* path = front_rom_dialog();
                 if (path != NULL) {
                   printf("path: %s\n", path);
                   free(path);
                 }
               } break;
+              case BUTTON_RUN:
+                sys->running = true;
+                break;
+              case BUTTON_STOP:
+                sys->running = false;
+                //sys_reset(sys);
+                break;
+              case BUTTON_PAUSE:
+                sys->running = false;
+                break;
+              case BUTTON_STEP:
+                break;
+              case BUTTON_TEST:
+                sys_test(sys);
+                break;
             }
           }
           break;
@@ -80,6 +108,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
         front_sdl_impl_flip(impl);
       }
       sys->ppu->flip = false;
+    } else if (!sys->running) {
+      front_sdl_impl_flip(impl);
     }
     last_tick = this_tick;
     SDL_Delay(10);
@@ -101,7 +131,7 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
   if (impl->mouse_y >= 0 && impl->mouse_y < 16) {
     // Button backgrounds
     bool sel = false;
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < 10; i++) {
       sel = impl->mouse_x >= i * 16 && impl->mouse_x < i * 16 + 16;
       if (sel && impl->mouse_down) {
         src.x = 16;
@@ -118,9 +148,9 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
     // Button icons
     src.x = 0;
     src.y = 48;
-    src.w = 8 * 16;
+    src.w = 10 * 16;
     dest.x = 0;
-    dest.w = 8 * 16;
+    dest.w = 10 * 16;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
   SDL_RenderPresent(impl->renderer);

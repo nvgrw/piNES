@@ -9,7 +9,7 @@
 #define IV_RESET 0xFFFC
 #define IV_IRQ_BRK 0xFFFE
 
-#define DEBUG 1
+// #define DEBUG 1
 
 cpu* cpu_init() {
   cpu* cpu = calloc(1, sizeof(cpu));
@@ -29,26 +29,20 @@ void cpu_deinit(cpu* cpu) {
   free(cpu);
 }
 
-void cpu_run(cpu* cpu) {
-  while (!cpu->halt) {
-    cpu_cycle(cpu);
-  }
-}
-
 void perform_irq(cpu* cpu);
 void perform_nmi(cpu* cpu);
 
-void cpu_cycle(cpu* cpu) {
+uint8_t cpu_cycle(cpu* cpu) {
   // Handle interrupts
   switch (cpu->last_interrupt) {
     case INTRT_IRQ:
       perform_irq(cpu);
       cpu->last_interrupt = INTRT_NONE;
-      break;
+      return 7;
     case INTRT_NMI:
       perform_nmi(cpu);
       cpu->last_interrupt = INTRT_NONE;
-      break;
+      return 7;
     default:
       break;
   }
@@ -58,6 +52,7 @@ void cpu_cycle(cpu* cpu) {
   instruction instr = INSTRUCTION_VECTOR[opcode];
   uint8_t bytes_used = 0;
   uint16_t address = 0;
+  bool page_crossed = false;
   // Resolve effective address based on addressing mode
   switch (instr.mode) {
     case AM_ACCUMULATOR:
@@ -92,11 +87,15 @@ void cpu_cycle(cpu* cpu) {
       bytes_used = 2;
     } break;
     case AM_ABSOLUTE_X:
-      address = cpu_mem_read16(cpu, cpu->program_counter + 1) + cpu->register_x;
+      address = cpu_mem_read16(cpu, cpu->program_counter + 1);
+      page_crossed = is_page_crossed(address, address + cpu->register_x);
+      address += cpu->register_x;
       bytes_used = 3;
       break;
     case AM_ABSOLUTE_Y:
-      address = cpu_mem_read16(cpu, cpu->program_counter + 1) + cpu->register_y;
+      address = cpu_mem_read16(cpu, cpu->program_counter + 1);
+      page_crossed = is_page_crossed(address, address + cpu->register_y);
+      address += cpu->register_y;
       bytes_used = 3;
       break;
     case AM_ZERO_PAGE_X:
@@ -122,8 +121,10 @@ void cpu_cycle(cpu* cpu) {
       break;
     case AM_ZERO_PAGE_INDIRECT_Y:
       address = cpu_mem_read16_bug(
-                    cpu, cpu_mem_read8(cpu, cpu->program_counter + 1)) +
-                cpu->register_y;
+                    cpu, cpu_mem_read8(cpu, cpu->program_counter + 1));
+      page_crossed = is_page_crossed(address, address + cpu->register_y);
+      address += cpu->register_y;
+      
       bytes_used = 2;
       break;
     case AM_INDIRECT:
@@ -146,6 +147,7 @@ void cpu_cycle(cpu* cpu) {
   // Execute
   uint16_t last_program_counter = cpu->program_counter;
   cpu->program_counter += bytes_used;
+  cpu->branch_taken = false;
   instr.implementation(cpu, address);
 
   cpu->addressing_special = false;
@@ -154,8 +156,11 @@ void cpu_cycle(cpu* cpu) {
   if (cpu->program_counter == last_program_counter) {
     printf("!!! CPU TRAPPED !!!\n");
     dbg_print_state(cpu);
-    exit(EXIT_FAILURE);
+    return 0;
   }
+
+  return instr.cycles + (instr.cycle_cross && page_crossed ? 1 : 0) +
+         (instr.cycle_branch && cpu->branch_taken ? 1 : 0);
 }
 
 /* Utilities */
@@ -209,7 +214,7 @@ void push16(cpu* cpu, uint16_t value) {
 }
 
 bool is_page_crossed(uint16_t address1, uint16_t address2) {
-  return (address1 & PAGE_MASK) != (address2 & PAGE_MASK);
+  return (address1 & PAGE_MASK) != ((address1 + 1) & PAGE_MASK);
 }
 
 void cpu_interrupt(cpu* cpu, interrupt_type type) {
@@ -275,7 +280,17 @@ void cpu_implcommon_adc(cpu* cpu, uint16_t address, bool subtract) {
   cpu_implcommon_set_zs(cpu, cpu->register_a);
 }
 
-// Implementation of instructions
+void cpu_implcommon_branch(cpu* cpu, uint16_t address, bool taken) {
+  if (taken) {
+    cpu->program_counter = address;
+    cpu->branch_taken = true;
+  }
+}
+
+/**
+ * Implementation of instructions
+ */
+
 // Add with carry
 void cpu_impl_adc(cpu* cpu, uint16_t address) {
   cpu_implcommon_adc(cpu, address, false);
@@ -314,23 +329,17 @@ void cpu_impl_asl(cpu* cpu, uint16_t address) {
 
 // Branch on carry clear
 void cpu_impl_bcc(cpu* cpu, uint16_t address) {
-  if (!cpu->register_status.flags.c) {
-    cpu->program_counter = address;
-  }
+  cpu_implcommon_branch(cpu, address, !cpu->register_status.flags.c);
 }
 
 // Branch on carry set
 void cpu_impl_bcs(cpu* cpu, uint16_t address) {
-  if (cpu->register_status.flags.c) {
-    cpu->program_counter = address;
-  }
+  cpu_implcommon_branch(cpu, address, cpu->register_status.flags.c);
 }
 
 // Branch on equal
 void cpu_impl_beq(cpu* cpu, uint16_t address) {
-  if (cpu->register_status.flags.z) {
-    cpu->program_counter = address;
-  }
+  cpu_implcommon_branch(cpu, address, cpu->register_status.flags.z);
 }
 
 // Bit test
@@ -343,23 +352,17 @@ void cpu_impl_bit(cpu* cpu, uint16_t address) {
 
 // Branch on minus
 void cpu_impl_bmi(cpu* cpu, uint16_t address) {
-  if (cpu->register_status.flags.s) {
-    cpu->program_counter = address;
-  }
+  cpu_implcommon_branch(cpu, address, cpu->register_status.flags.s);
 }
 
 // Branch on not equal
 void cpu_impl_bne(cpu* cpu, uint16_t address) {
-  if (!cpu->register_status.flags.z) {
-    cpu->program_counter = address;
-  }
+  cpu_implcommon_branch(cpu, address, !cpu->register_status.flags.z);
 }
 
 // Branch on plus
 void cpu_impl_bpl(cpu* cpu, uint16_t address) {
-  if (!cpu->register_status.flags.s) {
-    cpu->program_counter = address;
-  }
+  cpu_implcommon_branch(cpu, address, !cpu->register_status.flags.s);
 }
 
 // Software interrupt
@@ -374,16 +377,12 @@ void cpu_impl_brk(cpu* cpu, uint16_t address) {
 
 // Branch on overflow clear
 void cpu_impl_bvc(cpu* cpu, uint16_t address) {
-  if (!cpu->register_status.flags.v) {
-    cpu->program_counter = address;
-  }
+  cpu_implcommon_branch(cpu, address, !cpu->register_status.flags.v);
 }
 
 // Branch on overflow set
 void cpu_impl_bvs(cpu* cpu, uint16_t address) {
-  if (cpu->register_status.flags.v) {
-    cpu->program_counter = address;
-  }
+  cpu_implcommon_branch(cpu, address, cpu->register_status.flags.v);
 }
 
 // Clear carry
@@ -695,345 +694,282 @@ void cpu_impl_tya(cpu* cpu, uint16_t address) {
   cpu_implcommon_set_zs(cpu, cpu->register_a);
 }
 
-// Constants
-#define NULL_INSTRUCTION \
-  { .mode = AM_ACCUMULATOR, .mnemonic = "###", .implementation = NULL }
+// Macros to define instructions
+#define I(A, B, C) \
+  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
+    .cycles = C, .cycle_cross = false, .cycle_branch = false },
+#define IB(A, B, C) \
+  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
+    .cycles = C, .cycle_cross = true, .cycle_branch = true },
+#define IC(A, B, C) \
+  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
+    .cycles = C, .cycle_cross = true, .cycle_branch = false },
+#define NI \
+  { .mode = AM_ACCUMULATOR, .mnemonic = "###", .implementation = NULL },
+
 const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS] = {
-    {.mode = AM_IMPLIED, .mnemonic = "BRK", .implementation = &cpu_impl_brk},
-    {.mode = AM_ZERO_PAGE_INDIRECT,
-     .mnemonic = "ORA",
-     .implementation = &cpu_impl_ora},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE, .mnemonic = "ORA", .implementation = &cpu_impl_ora},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "ASL", .implementation = &cpu_impl_asl},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "PHP", .implementation = &cpu_impl_php},
-    {.mode = AM_IMMEDIATE, .mnemonic = "ORA", .implementation = &cpu_impl_ora},
-    {.mode = AM_ACCUMULATOR,
-     .mnemonic = "ASL",
-     .implementation = &cpu_impl_asl},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE, .mnemonic = "ORA", .implementation = &cpu_impl_ora},
-    {.mode = AM_ABSOLUTE, .mnemonic = "ASL", .implementation = &cpu_impl_asl},
-    NULL_INSTRUCTION,
-    {.mode = AM_RELATIVE, .mnemonic = "BPL", .implementation = &cpu_impl_bpl},
-    {.mode = AM_ZERO_PAGE_INDIRECT_Y,
-     .mnemonic = "ORA",
-     .implementation = &cpu_impl_ora},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "ORA",
-     .implementation = &cpu_impl_ora},
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "ASL",
-     .implementation = &cpu_impl_asl},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "CLC", .implementation = &cpu_impl_clc},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "ORA", .implementation = &cpu_impl_ora},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "ORA", .implementation = &cpu_impl_ora},
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "ASL", .implementation = &cpu_impl_asl},
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE, .mnemonic = "JSR", .implementation = &cpu_impl_jsr},
-    {.mode = AM_ZERO_PAGE_INDIRECT,
-     .mnemonic = "AND",
-     .implementation = &cpu_impl_and},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE, .mnemonic = "BIT", .implementation = &cpu_impl_bit},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "AND", .implementation = &cpu_impl_and},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "ROL", .implementation = &cpu_impl_rol},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "PLP", .implementation = &cpu_impl_plp},
-    {.mode = AM_IMMEDIATE, .mnemonic = "AND", .implementation = &cpu_impl_and},
-    {.mode = AM_ACCUMULATOR,
-     .mnemonic = "ROL",
-     .implementation = &cpu_impl_rol},
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE, .mnemonic = "BIT", .implementation = &cpu_impl_bit},
-    {.mode = AM_ABSOLUTE, .mnemonic = "AND", .implementation = &cpu_impl_and},
-    {.mode = AM_ABSOLUTE, .mnemonic = "ROL", .implementation = &cpu_impl_rol},
-    NULL_INSTRUCTION,
-    {.mode = AM_RELATIVE, .mnemonic = "BMI", .implementation = &cpu_impl_bmi},
-    {.mode = AM_ZERO_PAGE_INDIRECT_Y,
-     .mnemonic = "AND",
-     .implementation = &cpu_impl_and},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "AND",
-     .implementation = &cpu_impl_and},
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "ROL",
-     .implementation = &cpu_impl_rol},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "SEC", .implementation = &cpu_impl_sec},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "AND", .implementation = &cpu_impl_and},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "AND", .implementation = &cpu_impl_and},
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "ROL", .implementation = &cpu_impl_rol},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "RTI", .implementation = &cpu_impl_rti},
-    {.mode = AM_ZERO_PAGE_INDIRECT,
-     .mnemonic = "EOR",
-     .implementation = &cpu_impl_eor},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE, .mnemonic = "EOR", .implementation = &cpu_impl_eor},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "LSR", .implementation = &cpu_impl_lsr},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "PHA", .implementation = &cpu_impl_pha},
-    {.mode = AM_IMMEDIATE, .mnemonic = "EOR", .implementation = &cpu_impl_eor},
-    {.mode = AM_ACCUMULATOR,
-     .mnemonic = "LSR",
-     .implementation = &cpu_impl_lsr},
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE, .mnemonic = "JMP", .implementation = &cpu_impl_jmp},
-    {.mode = AM_ABSOLUTE, .mnemonic = "EOR", .implementation = &cpu_impl_eor},
-    {.mode = AM_ABSOLUTE, .mnemonic = "LSR", .implementation = &cpu_impl_lsr},
-    NULL_INSTRUCTION,
-    {.mode = AM_RELATIVE, .mnemonic = "BVC", .implementation = &cpu_impl_bvc},
-    {.mode = AM_ZERO_PAGE_INDIRECT_Y,
-     .mnemonic = "EOR",
-     .implementation = &cpu_impl_eor},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "EOR",
-     .implementation = &cpu_impl_eor},
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "LSR",
-     .implementation = &cpu_impl_lsr},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "CLI", .implementation = &cpu_impl_cli},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "EOR", .implementation = &cpu_impl_eor},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "EOR", .implementation = &cpu_impl_eor},
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "LSR", .implementation = &cpu_impl_lsr},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "RTS", .implementation = &cpu_impl_rts},
-    {.mode = AM_ZERO_PAGE_INDIRECT,
-     .mnemonic = "ADC",
-     .implementation = &cpu_impl_adc},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE, .mnemonic = "ADC", .implementation = &cpu_impl_adc},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "ROR", .implementation = &cpu_impl_ror},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "PLA", .implementation = &cpu_impl_pla},
-    {.mode = AM_IMMEDIATE, .mnemonic = "ADC", .implementation = &cpu_impl_adc},
-    {.mode = AM_ACCUMULATOR,
-     .mnemonic = "ROR",
-     .implementation = &cpu_impl_ror},
-    NULL_INSTRUCTION,
-    {.mode = AM_INDIRECT, .mnemonic = "JMP", .implementation = &cpu_impl_jmp},
-    {.mode = AM_ABSOLUTE, .mnemonic = "ADC", .implementation = &cpu_impl_adc},
-    {.mode = AM_ABSOLUTE, .mnemonic = "ROR", .implementation = &cpu_impl_ror},
-    NULL_INSTRUCTION,
-    {.mode = AM_RELATIVE, .mnemonic = "BVS", .implementation = &cpu_impl_bvs},
-    {.mode = AM_ZERO_PAGE_INDIRECT_Y,
-     .mnemonic = "ADC",
-     .implementation = &cpu_impl_adc},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "ADC",
-     .implementation = &cpu_impl_adc},
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "ROR",
-     .implementation = &cpu_impl_ror},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "SEI", .implementation = &cpu_impl_sei},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "ADC", .implementation = &cpu_impl_adc},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "ADC", .implementation = &cpu_impl_adc},
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "ROR", .implementation = &cpu_impl_ror},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_INDIRECT,
-     .mnemonic = "STA",
-     .implementation = &cpu_impl_sta},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE, .mnemonic = "STY", .implementation = &cpu_impl_sty},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "STA", .implementation = &cpu_impl_sta},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "STX", .implementation = &cpu_impl_stx},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "DEY", .implementation = &cpu_impl_dey},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "TXA", .implementation = &cpu_impl_txa},
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE, .mnemonic = "STY", .implementation = &cpu_impl_sty},
-    {.mode = AM_ABSOLUTE, .mnemonic = "STA", .implementation = &cpu_impl_sta},
-    {.mode = AM_ABSOLUTE, .mnemonic = "STX", .implementation = &cpu_impl_stx},
-    NULL_INSTRUCTION,
-    {.mode = AM_RELATIVE, .mnemonic = "BCC", .implementation = &cpu_impl_bcc},
-    {.mode = AM_ZERO_PAGE_INDIRECT_Y,
-     .mnemonic = "STA",
-     .implementation = &cpu_impl_sta},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "STY",
-     .implementation = &cpu_impl_sty},
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "STA",
-     .implementation = &cpu_impl_sta},
-    {.mode = AM_ZERO_PAGE_Y,
-     .mnemonic = "STX",
-     .implementation = &cpu_impl_stx},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "TYA", .implementation = &cpu_impl_tya},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "STA", .implementation = &cpu_impl_sta},
-    {.mode = AM_IMPLIED, .mnemonic = "TXS", .implementation = &cpu_impl_txs},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "STA", .implementation = &cpu_impl_sta},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_IMMEDIATE, .mnemonic = "LDY", .implementation = &cpu_impl_ldy},
-    {.mode = AM_ZERO_PAGE_INDIRECT,
-     .mnemonic = "LDA",
-     .implementation = &cpu_impl_lda},
-    {.mode = AM_IMMEDIATE, .mnemonic = "LDX", .implementation = &cpu_impl_ldx},
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE, .mnemonic = "LDY", .implementation = &cpu_impl_ldy},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "LDA", .implementation = &cpu_impl_lda},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "LDX", .implementation = &cpu_impl_ldx},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "TAY", .implementation = &cpu_impl_tay},
-    {.mode = AM_IMMEDIATE, .mnemonic = "LDA", .implementation = &cpu_impl_lda},
-    {.mode = AM_IMPLIED, .mnemonic = "TAX", .implementation = &cpu_impl_tax},
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE, .mnemonic = "LDY", .implementation = &cpu_impl_ldy},
-    {.mode = AM_ABSOLUTE, .mnemonic = "LDA", .implementation = &cpu_impl_lda},
-    {.mode = AM_ABSOLUTE, .mnemonic = "LDX", .implementation = &cpu_impl_ldx},
-    NULL_INSTRUCTION,
-    {.mode = AM_RELATIVE, .mnemonic = "BCS", .implementation = &cpu_impl_bcs},
-    {.mode = AM_ZERO_PAGE_INDIRECT_Y,
-     .mnemonic = "LDA",
-     .implementation = &cpu_impl_lda},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "LDY",
-     .implementation = &cpu_impl_ldy},
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "LDA",
-     .implementation = &cpu_impl_lda},
-    {.mode = AM_ZERO_PAGE_Y,
-     .mnemonic = "LDX",
-     .implementation = &cpu_impl_ldx},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "CLV", .implementation = &cpu_impl_clv},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "LDA", .implementation = &cpu_impl_lda},
-    {.mode = AM_IMPLIED, .mnemonic = "TSX", .implementation = &cpu_impl_tsx},
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "LDY", .implementation = &cpu_impl_ldy},
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "LDA", .implementation = &cpu_impl_lda},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "LDX", .implementation = &cpu_impl_ldx},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMMEDIATE, .mnemonic = "CPY", .implementation = &cpu_impl_cpy},
-    {.mode = AM_ZERO_PAGE_INDIRECT,
-     .mnemonic = "CMP",
-     .implementation = &cpu_impl_cmp},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE, .mnemonic = "CPY", .implementation = &cpu_impl_cpy},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "CMP", .implementation = &cpu_impl_cmp},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "DEC", .implementation = &cpu_impl_dec},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "INY", .implementation = &cpu_impl_iny},
-    {.mode = AM_IMMEDIATE, .mnemonic = "CMP", .implementation = &cpu_impl_cmp},
-    {.mode = AM_IMPLIED, .mnemonic = "DEX", .implementation = &cpu_impl_dex},
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE, .mnemonic = "CPY", .implementation = &cpu_impl_cpy},
-    {.mode = AM_ABSOLUTE, .mnemonic = "CMP", .implementation = &cpu_impl_cmp},
-    {.mode = AM_ABSOLUTE, .mnemonic = "DEC", .implementation = &cpu_impl_dec},
-    NULL_INSTRUCTION,
-    {.mode = AM_RELATIVE, .mnemonic = "BNE", .implementation = &cpu_impl_bne},
-    {.mode = AM_ZERO_PAGE_INDIRECT_Y,
-     .mnemonic = "CMP",
-     .implementation = &cpu_impl_cmp},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "CMP",
-     .implementation = &cpu_impl_cmp},
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "DEC",
-     .implementation = &cpu_impl_dec},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "CLD", .implementation = &cpu_impl_cld},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "CMP", .implementation = &cpu_impl_cmp},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "CMP", .implementation = &cpu_impl_cmp},
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "DEC", .implementation = &cpu_impl_dec},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMMEDIATE, .mnemonic = "CPX", .implementation = &cpu_impl_cpx},
-    {.mode = AM_ZERO_PAGE_INDIRECT,
-     .mnemonic = "SBC",
-     .implementation = &cpu_impl_sbc},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE, .mnemonic = "CPX", .implementation = &cpu_impl_cpx},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "SBC", .implementation = &cpu_impl_sbc},
-    {.mode = AM_ZERO_PAGE, .mnemonic = "INC", .implementation = &cpu_impl_inc},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "INX", .implementation = &cpu_impl_inx},
-    {.mode = AM_IMMEDIATE, .mnemonic = "SBC", .implementation = &cpu_impl_sbc},
-    {.mode = AM_IMPLIED, .mnemonic = "NOP", .implementation = &cpu_impl_nop},
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE, .mnemonic = "CPX", .implementation = &cpu_impl_cpx},
-    {.mode = AM_ABSOLUTE, .mnemonic = "SBC", .implementation = &cpu_impl_sbc},
-    {.mode = AM_ABSOLUTE, .mnemonic = "INC", .implementation = &cpu_impl_inc},
-    NULL_INSTRUCTION,
-    {.mode = AM_RELATIVE, .mnemonic = "BEQ", .implementation = &cpu_impl_beq},
-    {.mode = AM_ZERO_PAGE_INDIRECT_Y,
-     .mnemonic = "SBC",
-     .implementation = &cpu_impl_sbc},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "SBC",
-     .implementation = &cpu_impl_sbc},
-    {.mode = AM_ZERO_PAGE_X,
-     .mnemonic = "INC",
-     .implementation = &cpu_impl_inc},
-    NULL_INSTRUCTION,
-    {.mode = AM_IMPLIED, .mnemonic = "SED", .implementation = &cpu_impl_sed},
-    {.mode = AM_ABSOLUTE_Y, .mnemonic = "SBC", .implementation = &cpu_impl_sbc},
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    NULL_INSTRUCTION,
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "SBC", .implementation = &cpu_impl_sbc},
-    {.mode = AM_ABSOLUTE_X, .mnemonic = "INC", .implementation = &cpu_impl_inc},
-    NULL_INSTRUCTION,
+    I(IMPLIED, brk, 7)
+    I(ZERO_PAGE_INDIRECT, ora, 6)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE, ora, 3)
+    I(ZERO_PAGE, asl, 5)
+    NI
+    I(IMPLIED, php, 3)
+    I(IMMEDIATE, ora, 2)
+    I(ACCUMULATOR, asl, 2)
+    NI
+    NI
+    I(ABSOLUTE, ora, 4)
+    I(ABSOLUTE, asl, 6)
+    NI
+    IB(RELATIVE, bpl, 2)
+    IC(ZERO_PAGE_INDIRECT_Y, ora, 5)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE_X, ora, 4)
+    I(ZERO_PAGE_X, asl, 6)
+    NI
+    I(IMPLIED, clc, 2)
+    IC(ABSOLUTE_Y, ora, 4)
+    NI
+    NI
+    NI
+    IC(ABSOLUTE_X, ora, 4)
+    I(ABSOLUTE_X, asl, 7)
+    NI
+    I(ABSOLUTE, jsr, 6)
+    I(ZERO_PAGE_INDIRECT, and, 6)
+    NI
+    NI
+    I(ZERO_PAGE, bit, 3)
+    I(ZERO_PAGE, and, 3)
+    I(ZERO_PAGE, rol, 5)
+    NI
+    I(IMPLIED, plp, 4)
+    I(IMMEDIATE, and, 2)
+    I(ACCUMULATOR, rol, 2)
+    NI
+    I(ABSOLUTE, bit, 4)
+    I(ABSOLUTE, and, 4)
+    I(ABSOLUTE, rol, 6)
+    NI
+    IB(RELATIVE, bmi, 2)
+    IC(ZERO_PAGE_INDIRECT_Y, and, 5)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE_X, and, 4)
+    I(ZERO_PAGE_X, rol, 6)
+    NI
+    I(IMPLIED, sec, 2)
+    IC(ABSOLUTE_Y, and, 4)
+    NI
+    NI
+    NI
+    IC(ABSOLUTE_X, and, 4)
+    I(ABSOLUTE_X, rol, 7)
+    NI
+    I(IMPLIED, rti, 6)
+    I(ZERO_PAGE_INDIRECT, eor, 6)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE, eor, 3)
+    I(ZERO_PAGE, lsr, 5)
+    NI
+    I(IMPLIED, pha, 3)
+    I(IMMEDIATE, eor, 2)
+    I(ACCUMULATOR, lsr, 2)
+    NI
+    I(ABSOLUTE, jmp, 3)
+    I(ABSOLUTE, eor, 4)
+    I(ABSOLUTE, lsr, 6)
+    NI
+    IB(RELATIVE, bvc, 2)
+    IC(ZERO_PAGE_INDIRECT_Y, eor, 5)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE_X, eor, 4)
+    I(ZERO_PAGE_X, lsr, 6)
+    NI
+    I(IMPLIED, cli, 2)
+    IC(ABSOLUTE_Y, eor, 4)
+    NI
+    NI
+    NI
+    IC(ABSOLUTE_X, eor, 4)
+    I(ABSOLUTE_X, lsr, 7)
+    NI
+    I(IMPLIED, rts, 6)
+    I(ZERO_PAGE_INDIRECT, adc, 6)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE, adc, 3)
+    I(ZERO_PAGE, ror, 5)
+    NI
+    I(IMPLIED, pla, 4)
+    I(IMMEDIATE, adc, 2)
+    I(ACCUMULATOR, ror, 2)
+    NI
+    I(INDIRECT, jmp, 5)
+    I(ABSOLUTE, adc, 4)
+    I(ABSOLUTE, ror, 6)
+    NI
+    IB(RELATIVE, bvs, 2)
+    IC(ZERO_PAGE_INDIRECT_Y, adc, 5)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE_X, adc, 4)
+    I(ZERO_PAGE_X, ror, 6)
+    NI
+    I(IMPLIED, sei, 2)
+    IC(ABSOLUTE_Y, adc, 4)
+    NI
+    NI
+    NI
+    IC(ABSOLUTE_X, adc, 4)
+    I(ABSOLUTE_X, ror, 7)
+    NI
+    NI
+    I(ZERO_PAGE_INDIRECT, sta, 6)
+    NI
+    NI
+    I(ZERO_PAGE, sty, 3)
+    I(ZERO_PAGE, sta, 3)
+    I(ZERO_PAGE, stx, 3)
+    NI
+    I(IMPLIED, dey, 2)
+    NI
+    I(IMPLIED, txa, 2)
+    NI
+    I(ABSOLUTE, sty, 4)
+    I(ABSOLUTE, sta, 4)
+    I(ABSOLUTE, stx, 4)
+    NI
+    IB(RELATIVE, bcc, 2)
+    I(ZERO_PAGE_INDIRECT_Y, sta, 6)
+    NI
+    NI
+    I(ZERO_PAGE_X, sty, 4)
+    I(ZERO_PAGE_X, sta, 4)
+    I(ZERO_PAGE_Y, stx, 4)
+    NI
+    I(IMPLIED, tya, 2)
+    I(ABSOLUTE_Y, sta, 5)
+    I(IMPLIED, txs, 2)
+    NI
+    NI
+    I(ABSOLUTE_X, sta, 5)
+    NI
+    NI
+    I(IMMEDIATE, ldy, 2)
+    I(ZERO_PAGE_INDIRECT, lda, 6)
+    I(IMMEDIATE, ldx, 2)
+    NI
+    I(ZERO_PAGE, ldy, 3)
+    I(ZERO_PAGE, lda, 3)
+    I(ZERO_PAGE, ldx, 3)
+    NI
+    I(IMPLIED, tay, 2)
+    I(IMMEDIATE, lda, 2)
+    I(IMPLIED, tax, 2)
+    NI
+    I(ABSOLUTE, ldy, 4)
+    I(ABSOLUTE, lda, 4)
+    I(ABSOLUTE, ldx, 4)
+    NI
+    IB(RELATIVE, bcs, 2)
+    IC(ZERO_PAGE_INDIRECT_Y, lda, 5)
+    NI
+    NI
+    I(ZERO_PAGE_X, ldy, 4)
+    I(ZERO_PAGE_X, lda, 4)
+    I(ZERO_PAGE_Y, ldx, 4)
+    NI
+    I(IMPLIED, clv, 2)
+    IC(ABSOLUTE_Y, lda, 4)
+    I(IMPLIED, tsx, 2)
+    NI
+    IC(ABSOLUTE_X, ldy, 4)
+    IC(ABSOLUTE_X, lda, 4)
+    IC(ABSOLUTE_Y, ldx, 4)
+    NI
+    I(IMMEDIATE, cpy, 2)
+    I(ZERO_PAGE_INDIRECT, cmp, 6)
+    NI
+    NI
+    I(ZERO_PAGE, cpy, 3)
+    I(ZERO_PAGE, cmp, 3)
+    I(ZERO_PAGE, dec, 5)
+    NI
+    I(IMPLIED, iny, 2)
+    I(IMMEDIATE, cmp, 2)
+    I(IMPLIED, dex, 2)
+    NI
+    I(ABSOLUTE, cpy, 4)
+    I(ABSOLUTE, cmp, 4)
+    I(ABSOLUTE, dec, 6)
+    NI
+    IB(RELATIVE, bne, 2)
+    IC(ZERO_PAGE_INDIRECT_Y, cmp, 5)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE_X, cmp, 4)
+    I(ZERO_PAGE_X, dec, 6)
+    NI
+    I(IMPLIED, cld, 2)
+    IC(ABSOLUTE_Y, cmp, 4)
+    NI
+    NI
+    NI
+    IC(ABSOLUTE_X, cmp, 4)
+    I(ABSOLUTE_X, dec, 7)
+    NI
+    I(IMMEDIATE, cpx, 2)
+    I(ZERO_PAGE_INDIRECT, sbc, 6)
+    NI
+    NI
+    I(ZERO_PAGE, cpx, 3)
+    I(ZERO_PAGE, sbc, 3)
+    I(ZERO_PAGE, inc, 5)
+    NI
+    I(IMPLIED, inx, 2)
+    I(IMMEDIATE, sbc, 2)
+    I(IMPLIED, nop, 2)
+    NI
+    I(ABSOLUTE, cpx, 4)
+    I(ABSOLUTE, sbc, 4)
+    I(ABSOLUTE, inc, 6)
+    NI
+    IB(RELATIVE, beq, 2)
+    IC(ZERO_PAGE_INDIRECT_Y, sbc, 5)
+    NI
+    NI
+    NI
+    I(ZERO_PAGE_X, sbc, 4)
+    I(ZERO_PAGE_X, inc, 6)
+    NI
+    I(IMPLIED, sed, 2)
+    IC(ABSOLUTE_Y, sbc, 4)
+    NI
+    NI
+    NI
+    IC(ABSOLUTE_X, sbc, 4)
+    I(ABSOLUTE_X, inc, 7)
+    NI
 };
 
-#undef NULL_INSTRUCTION
+#undef I
+#undef IB
+#undef IC
+#undef NI
 
 // Debugging utils
 const char* dbg_address_mode_to_string(address_mode mode) {
