@@ -19,7 +19,7 @@ uint8_t apu_pulse0_output(apu* apu) { return -1; }
 
 uint8_t apu_pulse1_output(apu* apu) { return -1; }
 
-/* this farmulae are linear approximations */
+/* this formulae are linear approximations */
 
 uint8_t apu_pulses_output(apu* apu) {
   uint8_t pulse0 = apu_pulse0_output(apu);
