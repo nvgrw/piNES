@@ -45,15 +45,6 @@ const uint16_t APU_NOISE_TABLE[] = {4,   8,   16,  32,  64,  96,   128,  160,
 
 apu* apu_init(void) { return (apu*)calloc(1, sizeof(apu)); }
 
-bool apu_mem_is_valid(uint16_t address) {
-  uint16_t translated_address = apu_mem_translate(address);
-  return (START_CHANNELS <= translated_address &&
-          translated_address <= END_CHANNELS) ||
-         translated_address == STATUS || translated_address == FRAME_COUNTER;
-}
-
-uint16_t apu_mem_translate(uint16_t address) { return address; }
-
 uint8_t apu_pulse0_output(apu* apu) { return -1; }
 
 uint8_t apu_pulse1_output(apu* apu) { return -1; }

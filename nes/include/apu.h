@@ -4,8 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-/* using dummy memory for now
-until the cpu is done */
+#include "rom.h"
 
 /**
  * Lookup tables for the channels
@@ -209,7 +208,9 @@ typedef struct {
 
   frame_counter frame_counter;
 
-  uint8_t linear_counter_reload;
+  mapper* mapper;
+
+  bool linear_counter_reload;
   uint8_t last_buff_val;
 } apu;
 
@@ -223,8 +224,6 @@ apu* apu_init(void);
  * Memory acces utility functions
  */
 
-bool apu_mem_is_valid(uint16_t address);
-uint16_t apu_mem_translate(uint16_t address);
 void apu_mem_write(apu* apu, uint16_t address, uint8_t val);
 
 /**

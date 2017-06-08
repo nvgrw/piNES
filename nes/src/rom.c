@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "apu.h"
 #include "mappers.h"
 #include "ppu.h"
 
@@ -105,8 +106,8 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   // - iNES doesn't use bytes 10 - 15
   //   Although flags 10 is an unofficial extension
   rom_type type = ROMTYPE_ARCHAIC;
-  size_t prg_rom_size =
-      header->prg_rom | header->flags9.nes2.prg_rom_additional << 4;
+  size_t prg_rom_size = header->prg_rom | header->flags9.nes2.prg_rom_additional
+                                              << 4;
   if (header->flags7.data.ines_version == 2 &&
       prg_rom_size <= rom_size / 0x4000) {
     type = ROMTYPE_NES2;
@@ -163,7 +164,7 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   ret->mapped.ppu_pattable1 = ret->mapped.ppu_pattable0 + MC_PATTABLE_SIZE;
   ret->mapped.ppu_nametable0 = ret->memory->vram;
   ret->mapped.ppu_nametable1 = ret->mapped.ppu_nametable0 + MC_NAMETABLE_SIZE;
-  //ret->mapped.ppu_palettes = ret->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
+  // ret->mapped.ppu_palettes = ret->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
 
   if (rom_get_mapper_number(ret) != 0) {
     return RE_UNKNOWN_MAPPER;
@@ -271,13 +272,14 @@ bool rom_has_bus_conflicts(mapper* mapper) {
 /*
 void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
-    ppu_mem_write((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE, val);
-    return;
+    ppu_mem_write((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) %
+MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE, val); return;
   }
 }
 uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
   if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
-    return ppu_mem_read_dummy((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE);
+    return ppu_mem_read_dummy((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) %
+MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE);
   }
   return 0;
 }
@@ -343,13 +345,16 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   }
   if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
       address == 0x4014) {
-    ppu_mem_write((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE, val);
+    ppu_mem_write(
+        (ppu*)mapper->ppu,
+        ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE,
+        val);
     return;
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
     // TODO: Call aurel's function to deal with register writes
     // mapped.registers[address - MC_REGISTERS_BASE] = val;
-    return;
+    apu_mem_write(mapper->apu, address, val);
   }
 
   if (address >= MC_SRAM_BASE && address < MC_SRAM_UPPER) {
@@ -366,10 +371,12 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
   }
   if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
       address == 0x4014) {
-    return ppu_mem_read_dummy((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE);
+    return ppu_mem_read_dummy(
+        (ppu*)mapper->ppu,
+        ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE);
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
-    return 0; //mapper->mapped.registers[address - MC_REGISTERS_BASE];
+    return 0;  // mapper->mapped.registers[address - MC_REGISTERS_BASE];
   }
   return mapper->mapped.prg_rom1[address % 0x4000];
   /*

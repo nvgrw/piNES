@@ -76,8 +76,10 @@ void sys_rom(sys* sys, char* path) {
   if (sys->mapper != NULL) {
     sys->cpu->mapper = sys->mapper;
     sys->ppu->mapper = sys->mapper;
+    sys->apu->mapper = sys->mapper;
     sys->mapper->cpu = sys->cpu;
     sys->mapper->ppu = sys->ppu;
+    sys->mapper->apu = sys->apu;
   }
 }
 
