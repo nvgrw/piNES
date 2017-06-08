@@ -4,17 +4,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "rom.h"
-
 /**
  * Lookup tables for the channels
+ * TODO: May not actually need to be externed
  */
 extern const uint8_t APU_LENGTH_TABLE[];
 extern const uint8_t APU_DUTY_TABLE[];
 extern const uint16_t APU_NOISE_TABLE[];
 
-/* NES is little endian */
-
+// Bitfield structs
 typedef struct {
   union {
     struct {
@@ -44,7 +42,7 @@ typedef struct {
     struct {
       uint8_t high : 3;
       uint8_t length_counter_load : 5;
-      //also resets duty and starts envelope_period_or_volume..
+      // also resets duty and starts envelope_period_or_volume..
       //    apparently
     } fields;
     uint8_t raw;
@@ -223,35 +221,7 @@ apu* apu_init(void);
 /**
  * Memory acces utility functions
  */
-
 void apu_mem_write(apu* apu, uint16_t address, uint8_t val);
-
-/**
- *  DMC methods
- */
-
-uint8_t apu_dmc_output(apu* apuc);
-
-/**
- * Pulse methods
- */
-
-uint8_t apu_pulse0_output(apu* apu);
-uint8_t apu_pulse1_output(apu* apu);
-uint8_t apu_pulses_output(apu* apu);
-
-/**
- * Triangle methods
- */
-uint8_t apu_triangle_output(apu* apu);
-/**
- * Noise methods
- */
-
-uint8_t apu_noise_output(apu* apu);
-/**
- * APU mixer methods
- */
 
 /**
  * General output methods

@@ -43,14 +43,13 @@ const uint8_t APU_DUTY_TABLE[] = {0x40, 0x60, 0x78, 0x9f};
 const uint16_t APU_NOISE_TABLE[] = {4,   8,   16,  32,  64,  96,   128,  160,
                                     202, 254, 380, 508, 762, 1016, 2034, 4068};
 
-apu* apu_init(void) { return (apu*)calloc(1, sizeof(apu)); }
+apu* apu_init(void) { return calloc(1, sizeof(apu)); }
 
 uint8_t apu_pulse0_output(apu* apu) { return -1; }
 
 uint8_t apu_pulse1_output(apu* apu) { return -1; }
 
-/* this formulae are linear approximations */
-
+// These formulae are linear approximations
 uint8_t apu_pulses_output(apu* apu) {
   uint8_t pulse0 = apu_pulse0_output(apu);
   uint8_t pulse1 = apu_pulse1_output(apu);
@@ -66,14 +65,6 @@ uint8_t apu_tnd_output(apu* apu) {
   uint8_t noise = apu_noise_output(apu);
   uint8_t dmc = apu_dmc_output(apu);
   return 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
-}
-
-void apu_cycle(apu* apu) {
-  uint8_t pulse = apu_pulses_output(apu);
-  uint8_t tnd = apu_tnd_output(apu);
-
-  // apu_update_triangle(apu);
-  apu->last_buff_val = pulse + tnd;
 }
 
 void apu_update_triangle(apu* apu) {
@@ -106,47 +97,12 @@ void apu_update_triangle(apu* apu) {
   // TODO finish it
 }
 
-void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {
-  /*
-  switch (address) {
-    case PULSE1_REG1:
-      pulse_channel pulse;
-      pulse.reg1.raw = val;
-      break;
+void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {}
 
-    case PULSE1_REG2:
-      pulse_channel pulse;
-      pulse.reg2.raw = val;
-      break;
+void apu_cycle(apu* apu) {
+  uint8_t pulse = apu_pulses_output(apu);
+  uint8_t tnd = apu_tnd_output(apu);
 
-    case PULSE1_REG3:
-      pulse_channel pulse;
-      pulse.reg3.raw = val;
-      break;
-
-    case PULSE1_REG4:
-      pulse_channel pulse;
-      pulse.reg4.raw = val;
-      break;
-
-    case PULSE2_REG1:
-      pulse_channel pulse;
-      pulse.reg1.raw = val;
-      break;
-
-    case PULSE2_REG2:
-      pulse_channel pulse;
-      pulse.reg2.raw = val;
-      break;
-
-    case PULSE2_REG3:
-      pulse_channel pulse;
-      pulse.reg3.raw = val;
-      break;
-
-    case PULSE2_REG4:
-      pulse_channel pulse;
-      pulse.reg4.raw = val;
-      break;
-      */
+  // apu_update_triangle(apu);
+  apu->last_buff_val = pulse + tnd;
 }
