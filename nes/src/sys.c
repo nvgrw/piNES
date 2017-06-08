@@ -15,8 +15,9 @@ sys* sys_init(void) {
   ret->clock = 0.0;
   ret->cpu = cpu_init();
   ret->ppu = ppu_init();
+  ret->apu = apu_init();
   ret->mapper = NULL;
-  //ret->apu = apu_init();
+  // ret->apu = apu_init();
   ret->region = R_NTSC;
   ret->status = SS_NONE;
   ret->running = false;
@@ -46,10 +47,17 @@ void sys_run(sys* sys, uint32_t ms) {
 
       ppu_cycle(sys->ppu);
 
+      // TODO: Call out to frontend to play sound
       // apu cycle
 
       sys->clock -= CLOCK_PERIOD;
     }
+  }
+}
+
+void sys_audio_callback(sys* sys, uint8_t* stream, int len) {
+  for (int i = 0; i < len; i++) {
+    stream[i] = sys->apu->last_buff_val;
   }
 }
 
@@ -91,9 +99,7 @@ void sys_stop(sys* sys) {
   // also reset
 }
 
-void sys_pause(sys* sys) {
-  sys->running = false;
-}
+void sys_pause(sys* sys) { sys->running = false; }
 
 void sys_step(sys* sys) {
   if (sys->mapper == NULL) {

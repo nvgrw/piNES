@@ -6,6 +6,8 @@
 #define STATUS 0x4015
 #define FRAME_COUNTER 0x4017
 
+apu* apu_init(void) { return (apu*)calloc(1, sizeof(apu)); }
+
 bool apu_mem_is_valid(uint16_t address) {
   uint16_t translated_address = apu_mem_translate(address);
   return (START_CHANNELS <= translated_address &&
@@ -38,10 +40,8 @@ uint8_t apu_tnd_output(apu* apu) {
   return 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
 }
 
-uint8_t apu_output(apu* apu) {
+uint8_t apu_cycle(apu* apu) {
   uint8_t pulse = apu_pulses_output(apu);
   uint8_t tnd = apu_tnd_output(apu);
   return pulse + tnd;
 }
-
-apu* apu_init(void) { return (apu*)calloc(1, sizeof(apu)); }

@@ -1,15 +1,15 @@
 #pragma once
 
-#include <stdbool.h>
 #include <SDL.h>
+#include <stdbool.h>
 
-#include "front_impl.h"
 #include "front.h"
+#include "front_impl.h"
 #include "ppu.h"
 
 /**
  * front_sdl.h
- * 
+ *
  * SDL front.
  */
 
@@ -21,6 +21,7 @@ typedef struct {
   SDL_Renderer* renderer;
   SDL_Texture* ui;
   SDL_Texture* screen_tex;
+  SDL_AudioDeviceID audio_device;
   uint32_t palette[32];
   uint32_t screen_pix[PPU_SCREEN_SIZE];
 

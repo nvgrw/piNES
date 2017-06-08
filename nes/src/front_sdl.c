@@ -1,15 +1,16 @@
+#include <SDL.h>
+#include <SDL_image.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <SDL.h>
-#include <SDL_image.h>
+#include <time.h>
 
 #include "error.h"
 #include "front.h"
 #include "front_sdl.h"
-#include "region.h"
 #include "ppu.h"
+#include "region.h"
 #include "sys.h"
 
 #define dbg(X) printf(X "\n");
@@ -35,6 +36,7 @@
  * Helper functions
  */
 void front_sdl_impl_deinit(front_sdl_impl* impl) {
+  SDL_CloseAudioDevice(impl->audio_device);
   SDL_Quit();
   free(impl);
 }
@@ -97,7 +99,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
       void* pixels;
       uint32_t pitch;
       if (SDL_LockTexture(impl->screen_tex, NULL, &pixels, (void*)&pitch)) {
-        //printf("err: %s\n", SDL_GetError());
+        // printf("err: %s\n", SDL_GetError());
       } else {
         for (int i = 0; i < PPU_SCREEN_SIZE; i++) {
           impl->screen_pix[i] = impl->palette[sys->ppu->screen[i]];
@@ -164,9 +166,13 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
   SDL_RenderClear(impl->renderer);
 }
 
+void front_sdl_impl_audio_callback(void* userdata, Uint8* stream, int len) {
+  sys_audio_callback(((front_sdl_impl*)userdata)->front->sys, stream, len);
+}
+
 /**
  * Public functions
- * 
+ *
  * See front_sdl.h for descriptions.
  */
 front_sdl_impl* front_sdl_impl_init(front* front) {
@@ -194,15 +200,16 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
 
   // Initialise palette
   for (int i = 0; i < 32; i++) {
-    impl->palette[i] = 0xFF000000 | ((uint32_t*)ui->pixels)[(i % 16) * 8 + (i >> 8) * ui->w];
+    impl->palette[i] =
+        0xFF000000 | ((uint32_t*)ui->pixels)[(i % 16) * 8 + (i >> 8) * ui->w];
   }
 
   // Create window
   uint32_t width = region_screen_width(front->sys->region) * front->scale;
   uint32_t height = region_screen_height(front->sys->region) * front->scale;
-  impl->window = SDL_CreateWindow("pines", SDL_WINDOWPOS_CENTERED,
-                                  SDL_WINDOWPOS_CENTERED, width, height,
-                                  SDL_WINDOW_OPENGL);
+  impl->window =
+      SDL_CreateWindow("pines", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                       width, height, SDL_WINDOW_OPENGL);
   if (!impl->window) {
     fprintf(stderr, "Could not create window\n");
     SDL_FreeSurface(ui);
@@ -211,9 +218,8 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   }
 
   // Create renderer
-  impl->renderer = SDL_CreateRenderer(impl->window, -1,
-                                      SDL_RENDERER_ACCELERATED |
-                                      SDL_RENDERER_TARGETTEXTURE);
+  impl->renderer = SDL_CreateRenderer(
+      impl->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
   if (!impl->renderer) {
     fprintf(stderr, "Could not create renderer\n");
     SDL_FreeSurface(ui);
@@ -243,6 +249,26 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   // Fill screen with black
   SDL_SetRenderDrawColor(impl->renderer, 0, 0, 0, 255);
   SDL_RenderClear(impl->renderer);
+
+  // Initialise audio
+  SDL_AudioSpec audio_want, audio_have;
+  audio_want.freq =
+      44100;  // TODO: This can probably be reduced to CPU freq / 2
+  audio_want.format = AUDIO_U8;
+  audio_want.samples = 256;
+  audio_want.callback = front_sdl_impl_audio_callback;
+  audio_want.channels = 1;
+  audio_want.userdata = impl;
+
+  if ((impl->audio_device = SDL_OpenAudioDevice(
+           NULL, 0, &audio_want, &audio_have, SDL_AUDIO_ALLOW_FORMAT_CHANGE)) ==
+      0) {
+    fprintf(stderr, "Could not create audio device\n");
+    free(impl);
+    return NULL;
+  }
+
+  SDL_PauseAudioDevice(impl->audio_device, false);
 
   impl->front = front;
   return impl;

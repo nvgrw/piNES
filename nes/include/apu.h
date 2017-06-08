@@ -4,7 +4,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-
 /* using dummy memory for now
 until the cpu is done */
 
@@ -42,7 +41,6 @@ typedef union {
 } pulse_channel;
 
 typedef union {
-
   struct {
     struct {
       uint8_t lin_count_reload_val : 7;
@@ -150,6 +148,8 @@ typedef struct {
 
   control control;
   status status;
+
+  uint8_t last_buff_val;
 } apu;
 
 /**
@@ -169,7 +169,7 @@ uint16_t apu_mem_translate(uint16_t address);
  *  DMC methods
  */
 
- uint8_t apu_dmc_output(apu* apuc);
+uint8_t apu_dmc_output(apu* apuc);
 
 /**
  * Pulse methods
@@ -182,19 +182,17 @@ uint8_t apu_pulses_output(apu* apu);
 /**
  * Triangle methods
  */
- uint8_t apu_triangle_output(apu* apu);
+uint8_t apu_triangle_output(apu* apu);
 /**
  * Noise methods
  */
 
- uint8_t apu_noise_output(apu* apu);
+uint8_t apu_noise_output(apu* apu);
 /**
  * APU mixer methods
  */
 
-
- /**
-  * General output methods
-  */
-
-uint8_t apu_output(apu* apu);
+/**
+ * General output methods
+ */
+uint8_t apu_cycle(apu* apu);

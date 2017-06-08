@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#include "apu.h"
 #include "cpu.h"
 #include "ppu.h"
 #include "region.h"
@@ -9,7 +10,7 @@
 
 /**
  * sys.h
- * 
+ *
  * Struct defining the NES system as a whole.
  */
 
@@ -25,7 +26,7 @@ typedef struct {
   cpu* cpu;
   ppu* ppu;
   mapper* mapper;
-  // apu* apu;
+  apu* apu;
   // controller* ctrl1;
   // controller* ctrl2;
   region region;
@@ -37,6 +38,7 @@ typedef struct {
 sys* sys_init(void);
 
 void sys_run(sys* sys, uint32_t ms);
+void sys_audio_callback(sys* sys, uint8_t* stream, int len);
 
 void sys_rom(sys* sys, char* path);
 void sys_start(sys* sys);
