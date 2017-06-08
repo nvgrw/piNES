@@ -54,7 +54,21 @@
 #define MC_NAMETABLE3_BASE 0x2C00
 #define MC_NAMETABLE3_UPPER (MC_NAMETABLE3_BASE + MC_NAMETABLE_SIZE)
 
-rom_error rom_load(mapper** mappr, const char* path) {
+int fread_all(FILE* fp, uint8_t* buf, size_t size) {
+  uint32_t read_done = 0;
+  uint32_t read_pending = size;
+  while (!feof(fp) && read_pending > 0) {
+    uint32_t read_iter = fread(buf + read_done, 1, read_pending, fp);
+    read_done += read_iter;
+    read_pending -= read_iter;
+  }
+  if (read_pending > 0) {
+    return 1;
+  }
+  return 0;
+}
+
+rom_error rom_load(mapper** mapper_ptr, const char* path) {
   FILE* fp;
   if (!(fp = fopen(path, "r"))) {
     return RE_READ_ERROR;
@@ -65,7 +79,7 @@ rom_error rom_load(mapper** mappr, const char* path) {
   rewind(fp);
 
   uint8_t header_data[HEADER_SIZE];
-  if (fread(header_data, 1, HEADER_SIZE, fp) != HEADER_SIZE) {
+  if (fread_all(fp, header_data, HEADER_SIZE)) {
     // No complete header present
     fclose(fp);
     return RE_INVALID_FILE_FORMAT;
@@ -78,8 +92,7 @@ rom_error rom_load(mapper** mappr, const char* path) {
   }
 
   // Allocate the mapper & assign it to the double pointer
-  mapper* mapper;
-  mapper = *mappr = malloc(sizeof(mapper));
+  mapper* ret = *mapper_ptr = malloc(sizeof(mapper));
 
   // Allocate the header
   rom_header* header = malloc(sizeof(rom_header));
@@ -101,8 +114,8 @@ rom_error rom_load(mapper** mappr, const char* path) {
     type = ROMTYPE_INES;
   }
 
-  mapper->header = header;
-  mapper->type = type;
+  ret->header = header;
+  ret->type = type;
 
   // Skip the trainer, if present
   if (header->flags6.data.has_trainer) {
@@ -111,22 +124,22 @@ rom_error rom_load(mapper** mappr, const char* path) {
 
   // Populate the memory struct
   memory* mem = calloc(sizeof(memory), 1);
-  mapper->memory = mem;
-  prg_rom_size = rom_get_prg_rom_size(mapper);
+  ret->memory = mem;
+  prg_rom_size = rom_get_prg_rom_size(ret);
 
   mem->prg_rom = malloc(sizeof(uint8_t) * prg_rom_size);
-  if (fread(mem->prg_rom, 1, prg_rom_size, fp) != prg_rom_size) {
+  if (fread_all(fp, mem->prg_rom, prg_rom_size)) {
     fclose(fp);
-    rom_destroy(mapper);
+    rom_destroy(ret);
     return RE_PRG_READ_ERROR;
   }
 
-  size_t chr_rom_size = rom_get_chr_rom_size(mapper);
+  size_t chr_rom_size = rom_get_chr_rom_size(ret);
   if (chr_rom_size != 0) {
     mem->chr_rom = malloc(sizeof(uint8_t) * chr_rom_size);
-    if (fread(mem->chr_rom, 1, chr_rom_size, fp) != chr_rom_size) {
+    if (fread_all(fp, mem->chr_rom, chr_rom_size)) {
       fclose(fp);
-      rom_destroy(mapper);
+      rom_destroy(ret);
       return RE_CHR_READ_ERROR;
     }
   }
@@ -134,23 +147,26 @@ rom_error rom_load(mapper** mappr, const char* path) {
   fclose(fp);
 
   // Set up the mapped memory with some defaults
-  mapper->mapped.ram = mapper->memory->ram;
-  mapper->mapped.registers = mapper->memory->registers;
-  mapper->mapped.cart_expansion_rom = NULL;
-  mapper->mapped.sram = NULL;
-  mapper->mapped.prg_rom1 = mapper->memory->prg_rom;
-  mapper->mapped.prg_rom2 = mapper->memory->prg_rom + MC_PRG_ROM_SIZE;
-  mapper->mapped.ppu_pattable0 = mapper->memory->chr_rom;
-  mapper->mapped.ppu_pattable1 =
-      mapper->mapped.ppu_pattable0 + MC_PATTABLE_SIZE;
-  mapper->mapped.ppu_nametable0 =
-      mapper->mapped.ppu_pattable1 + MC_PATTABLE_SIZE;
-  mapper->mapped.ppu_nametable1 =
-      mapper->mapped.ppu_nametable0 + MC_NAMETABLE_SIZE;
-  mapper->mapped.ppu_palettes =
-      mapper->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
+  ret->mapped.ram = ret->memory->ram;
+  ret->mapped.registers = ret->memory->registers;
+  ret->mapped.cart_expansion_rom = NULL;
+  ret->mapped.sram = NULL;
+  ret->mapped.prg_rom1 = ret->memory->prg_rom;
+  ret->mapped.prg_rom2 = ret->memory->prg_rom + MC_PRG_ROM_SIZE;
+  ret->mapped.ppu_pattable0 = ret->memory->chr_rom;
+  ret->mapped.ppu_pattable1 =
+      ret->mapped.ppu_pattable0 + MC_PATTABLE_SIZE;
+  ret->mapped.ppu_nametable0 =
+      ret->mapped.ppu_pattable1 + MC_PATTABLE_SIZE;
+  ret->mapped.ppu_nametable1 =
+      ret->mapped.ppu_nametable0 + MC_NAMETABLE_SIZE;
+  ret->mapped.ppu_palettes =
+      ret->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
 
-  MAPPERS[rom_get_mapper_number(mapper)].mapper_init(mapper);
+  if (rom_get_mapper_number(ret) != 0) {
+    return RE_UNKNOWN_MAPPER;
+  }
+  MAPPERS[rom_get_mapper_number(ret)].mapper_init(ret);
 
   return RE_SUCCESS;
 }
@@ -279,10 +295,13 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
 }
 
 uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
+  printf("mmap cpu read: %d\n", address);
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
+    printf("A\n");
     return mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE];
   }
   if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
+      printf("B\n");
     // return mapper->mapped
     //     .ppu_ctrl_regs[(address - MC_PPU_CTRL_BASE) %
     //     PPU_CTRL_REGISTERS_SIZE];
@@ -290,22 +309,28 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
     return 0;
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
+    printf("C\n");
     return mapper->mapped.registers[address - MC_REGISTERS_BASE];
   }
   if (address >= MC_CART_EXPANSION_ROM_BASE &&
       address < MC_CART_EXPANSION_ROM_UPPER) {
+    printf("D\n");
     return mapper->mapped
         .cart_expansion_rom[address - MC_CART_EXPANSION_ROM_BASE];
   }
   if (address >= MC_SRAM_BASE && address < MC_SRAM_UPPER) {
+    printf("E\n");
     return mapper->mapped.sram[address - MC_SRAM_BASE];
   }
   if (address >= MC_PRG_ROM1_BASE && address < MC_PRG_ROM1_UPPER) {
+    printf("F\n");
     return mapper->mapped.prg_rom1[address - MC_PRG_ROM1_BASE];
   }
   if (address >= MC_PRG_ROM2_BASE && address <= MC_PRG_ROM2_UPPER) {
+    printf("G\n");
     return mapper->mapped.prg_rom2[address - MC_PRG_ROM2_BASE];
   }
+  printf("H\n");
 
   return MAPPERS[rom_get_mapper_number(mapper)].cpu_read(mapper, address);
 }

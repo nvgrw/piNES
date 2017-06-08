@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "rom.h"
+
 /**
  * cpu.h
  * 
@@ -56,6 +58,7 @@ typedef struct {
    * TODO: NES Memory maps a lot of addresses, so once the CPU functional tests
    * pass, this needs to be revised
    */
+  mapper* mapper;
   uint8_t* memory;
 
   // Misc
@@ -67,6 +70,7 @@ typedef struct {
 
 // Functions
 cpu* cpu_init();
+void cpu_reset(cpu* cpu);
 void cpu_deinit(cpu* cpu);
 uint8_t cpu_cycle(cpu* cpu);
 

@@ -22,11 +22,11 @@ MOD_LDFLAGS = $(SDL_LDFLAGS) $(SDL_IMAGE_LDFLAGS) $(NFD_LDFLAGS) -framework AppK
 all: dir $(SPC_BUILD_DIR)/$(SPC_BINARY)
 
 # specific dependencies
-_SDEPS = cpu error front front_impl front_sdl ppu region sys
+_SDEPS = cpu error front front_impl front_sdl mappers ppu region rom sys
 SDEPS = $(patsubst %,$(SPC_INCLUDE_DIR)/%.h,$(_SDEPS))
 
 # specific object files
-_SOBJ = cpu front front_sdl ppu region sys
+_SOBJ = cpu front front_sdl mappers ppu region rom sys
 SOBJ = $(patsubst %,$(SPC_BUILD_DIR)/%.o,$(_SOBJ))
 
 $(SPC_BUILD_DIR)/%.o: $(SPC_SOURCE_DIR)/%.c $(SDEPS)
@@ -38,7 +38,7 @@ dir:
 $(SPC_BUILD_DIR)/$(SPC_BINARY): $(SPC_BUILD_DIR)/$(SPC_BINARY).o $(SOBJ)
 	$(CC) -o $@ $^ $(MOD_CFLAGS) $(MOD_LDFLAGS)
 
-.PHONY: clean
+.PHONY: all clean dir
 
 clean:
 	rm -f $(SPC_BUILD_DIR)/*

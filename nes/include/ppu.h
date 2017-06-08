@@ -136,9 +136,6 @@ typedef struct {
   // TODO: this is virtual
   uint8_t oam_data;
 
-  // TODO: this is also virtual
-  uint8_t data;
-
   uint8_t memory[PPU_MEMORY];
 
   // Status

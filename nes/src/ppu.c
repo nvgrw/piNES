@@ -52,7 +52,8 @@ void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value) {
       ppu->w = !ppu->w;
       break;
     case PPU_ADDR_PPUDATA:
-      // TODO: increment according to 0x2000 : 2
+      // write value to VRAM location ppu->t.raw
+      ppu->t.raw += (ppu->ctrl.flags.increment ? 1 : 32);
       break;
     case PPU_ADDR_OAMDMA:
       // TODO: OAM write from CPU to PPU
@@ -70,8 +71,9 @@ uint8_t ppu_mem_read(ppu* ppu, uint16_t address) {
     case PPU_ADDR_OAMDATA:
       return ppu->oam_data;
     case PPU_ADDR_PPUDATA:
-      // TODO: maybe increment?
-      return ppu->data;
+      // read value from VRAM location ppu->t.raw
+      ppu->t.raw += (ppu->ctrl.flags.increment ? 1 : 32);
+      return 0;
   }
   return 0;
 }

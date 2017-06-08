@@ -15,8 +15,10 @@ sys* sys_init(void) {
   ret->clock = 0.0;
   ret->cpu = cpu_init();
   ret->ppu = ppu_init();
+  ret->mapper = NULL;
   //ret->apu = apu_init();
   ret->region = R_NTSC;
+  ret->status = SS_NONE;
   ret->running = false;
   return ret;
 }
@@ -49,6 +51,56 @@ void sys_run(sys* sys, uint32_t ms) {
       sys->clock -= CLOCK_PERIOD;
     }
   }
+}
+
+void sys_rom(sys* sys, char* path) {
+  rom_error error = rom_load(&sys->mapper, path);
+  switch (error) {
+    case RE_SUCCESS:
+      sys->status = SS_NONE;
+      break;
+    case RE_READ_ERROR:
+    case RE_INVALID_FILE_FORMAT:
+    case RE_PRG_READ_ERROR:
+    case RE_CHR_READ_ERROR:
+      sys->status = SS_ROM_DAMAGED;
+      sys->mapper = NULL;
+      break;
+    case RE_UNKNOWN_MAPPER:
+      sys->status = SS_ROM_MAPPER;
+      sys->mapper = NULL;
+      break;
+  }
+  if (sys->mapper != NULL) {
+    // TODO: refactor CPU
+    sys->cpu->mapper = sys->mapper;
+  }
+}
+
+void sys_start(sys* sys) {
+  if (sys->mapper == NULL) {
+    sys->status = SS_ROM_MISSING;
+    return;
+  }
+  cpu_reset(sys->cpu);
+  sys->running = true;
+}
+
+void sys_stop(sys* sys) {
+  sys->running = false;
+  // also reset
+}
+
+void sys_pause(sys* sys) {
+  sys->running = false;
+}
+
+void sys_step(sys* sys) {
+  if (sys->mapper == NULL) {
+    sys->status = SS_ROM_MISSING;
+    return;
+  }
+  // stub
 }
 
 void sys_test(sys* sys) {

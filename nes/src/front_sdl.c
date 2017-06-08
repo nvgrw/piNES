@@ -15,7 +15,7 @@
 #define dbg(X) printf(X "\n");
 
 #define BUTTON_LOAD 0
-#define BUTTON_RUN 1
+#define BUTTON_START 1
 #define BUTTON_STOP 2
 #define BUTTON_PAUSE 3
 #define BUTTON_STEP 4
@@ -61,27 +61,27 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
           break;
         case SDL_MOUSEBUTTONUP:
           impl->mouse_down = false;
-          if (impl->mouse_x >= 0 && impl->mouse_x < 10 * 16 + 16 &&
+          if (impl->mouse_x >= 0 && impl->mouse_x < BUTTON_NUM * 16 + 16 &&
               impl->mouse_y >= 0 && impl->mouse_y < 16) {
             switch (impl->mouse_x / 16) {
               case BUTTON_LOAD: {
                 char* path = front_rom_dialog();
                 if (path != NULL) {
-                  printf("path: %s\n", path);
+                  sys_rom(sys, path);
                   free(path);
                 }
               } break;
-              case BUTTON_RUN:
-                sys->running = true;
+              case BUTTON_START:
+                sys_start(sys);
                 break;
               case BUTTON_STOP:
-                sys->running = false;
-                //sys_reset(sys);
+                sys_stop(sys);
                 break;
               case BUTTON_PAUSE:
-                sys->running = false;
+                sys_pause(sys);
                 break;
               case BUTTON_STEP:
+                sys_step(sys);
                 break;
               case BUTTON_TEST:
                 sys_test(sys);
@@ -146,11 +146,18 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
     }
 
     // Button icons
-    src.x = 0;
+    src.x = dest.x = 0;
     src.y = 48;
-    src.w = 10 * 16;
-    dest.x = 0;
-    dest.w = 10 * 16;
+    src.w = dest.w = 10 * 16;
+    SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
+  }
+  if (impl->front->sys->status != SS_NONE) {
+    src.x = 80 + (impl->front->sys->status - 1) * 24;
+    src.y = 64;
+    src.w = dest.w = 24;
+    src.h = dest.h = 24;
+    dest.x = 24;
+    dest.y = 24;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
   SDL_RenderPresent(impl->renderer);

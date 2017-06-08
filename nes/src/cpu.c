@@ -1,6 +1,7 @@
-#include "cpu.h"
-#include <assert.h>
 #include <stdio.h>
+
+#include "cpu.h"
+#include "rom.h"
 
 #define PAGE_MASK 0xFF00
 #define BREAK_MASK 0x10
@@ -12,20 +13,22 @@
 // #define DEBUG 1
 
 cpu* cpu_init() {
-  cpu* cpu = calloc(1, sizeof(cpu));
-  cpu->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
+  cpu* ret = calloc(1, sizeof(cpu));
+  //ret->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
+  return ret;
+}
+
+void cpu_reset(cpu* cpu) {
   cpu->register_status.raw = STATUS_DEFAULT;
   cpu->stack_pointer = STACK_DEFAULT;
   cpu->last_interrupt = INTRT_NONE;
 
   // Reset on power on (not done for tests)
-  // cpu_interrupt(cpu, INTRT_RESET);
-
-  return cpu;
+  cpu_interrupt(cpu, INTRT_RESET);
 }
 
 void cpu_deinit(cpu* cpu) {
-  free(cpu->memory);
+  //free(cpu->memory);
   free(cpu);
 }
 
@@ -165,11 +168,13 @@ uint8_t cpu_cycle(cpu* cpu) {
 
 /* Utilities */
 uint8_t cpu_mem_read8(cpu* cpu, uint16_t address) {
-  return cpu->memory[address];
+  return mmap_cpu_read(cpu->mapper, address);
+  //return cpu->memory[address];
 }
 
 void cpu_mem_write8(cpu* cpu, uint16_t address, uint8_t value) {
-  cpu->memory[address] = value;
+  mmap_cpu_write(cpu->mapper, address, value);
+  //cpu->memory[address] = value;
 }
 
 uint16_t cpu_mem_read16(cpu* cpu, uint16_t address) {
