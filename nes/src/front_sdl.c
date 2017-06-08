@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "error.h"
 #include "front.h"
@@ -24,9 +23,10 @@
 #define BUTTON_PPU 6
 #define BUTTON_APU 7
 #define BUTTON_IO 8
-#define BUTTON_TEST 9
+#define BUTTON_MMC 9
+#define BUTTON_TEST 10
 
-#define BUTTON_NUM 10
+#define BUTTON_NUM 11
 
 /**
  * front_sdl.c
@@ -65,7 +65,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
           impl->mouse_down = false;
           if (impl->mouse_x >= 0 && impl->mouse_x < BUTTON_NUM * 16 + 16 &&
               impl->mouse_y >= 0 && impl->mouse_y < 16) {
-            switch (impl->mouse_x / 16) {
+            uint8_t but_sel = impl->mouse_x / 16;
+            switch (but_sel) {
               case BUTTON_LOAD: {
                 char* path = front_rom_dialog();
                 if (path != NULL) {
@@ -85,6 +86,19 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
               case BUTTON_STEP:
                 sys_step(sys);
                 break;
+              case BUTTON_CPU:
+              case BUTTON_PPU:
+              case BUTTON_APU:
+              case BUTTON_IO:
+              case BUTTON_MMC:
+                if (impl->front->tab == but_sel - BUTTON_CPU + FT_CPU) {
+                  impl->front->tab = FT_SCREEN;
+                  SDL_SetWindowSize(impl->window, 256, 240);
+                } else {
+                  impl->front->tab = but_sel - BUTTON_CPU + FT_CPU;
+                  SDL_SetWindowSize(impl->window, 256, 256);
+                }
+                break;
               case BUTTON_TEST:
                 sys_test(sys);
                 break;
@@ -95,37 +109,95 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
     }
     uint32_t this_tick = SDL_GetTicks();
     sys_run(sys, this_tick - last_tick);
-    if (sys->ppu->flip) {
-      void* pixels;
-      uint32_t pitch;
-      if (SDL_LockTexture(impl->screen_tex, NULL, &pixels, (void*)&pitch)) {
-        // printf("err: %s\n", SDL_GetError());
-      } else {
-        for (int i = 0; i < PPU_SCREEN_SIZE; i++) {
-          impl->screen_pix[i] = impl->palette[sys->ppu->screen[i]];
-        }
-        memcpy(pixels, impl->screen_pix, PPU_SCREEN_SIZE_BYTES);
-        SDL_UnlockTexture(impl->screen_tex);
-        SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, NULL);
-        front_sdl_impl_flip(impl);
-      }
-      sys->ppu->flip = false;
-    } else if (!sys->running) {
-      front_sdl_impl_flip(impl);
-    }
     last_tick = this_tick;
-    SDL_Delay(10);
+    if (sys->running && impl->front->tab == FT_SCREEN) {
+      // If the system is running, flip on demand
+      if (sys->ppu->flip) {
+        void* pixels;
+        uint32_t pitch;
+        if (SDL_LockTexture(impl->screen_tex, NULL, &pixels, (void*)&pitch)) {
+          // printf("err: %s\n", SDL_GetError());
+        } else {
+          for (int i = 0; i < PPU_SCREEN_SIZE; i++) {
+            impl->screen_pix[i] = impl->palette[sys->ppu->screen[i]];
+          }
+          memcpy(pixels, impl->screen_pix, PPU_SCREEN_SIZE_BYTES);
+          SDL_UnlockTexture(impl->screen_tex);
+          SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, NULL);
+          front_sdl_impl_flip(impl);
+        }
+        sys->ppu->flip = false;
+      }
+      SDL_Delay(10);
+    } else {
+      // Otherwise flip on every frame
+      front_sdl_impl_flip(impl);
+      SDL_Delay(100);
+    }
   }
 }
 
 void front_sdl_impl_flip(front_sdl_impl* impl) {
-  // Render the UI
   SDL_Rect src;
+  SDL_Rect dest;
+
+  mapper* mapper = impl->front->sys->mapper;
+  uint16_t pc = impl->front->sys->cpu->program_counter;
+  switch (impl->front->tab) {
+    case FT_SCREEN:
+      break;
+    case FT_PPU: {
+      if (mapper != NULL) {
+        uint32_t* pixels;
+        uint32_t pitch;
+        if (SDL_LockTexture(impl->screen_tex, NULL, (void**)&pixels,
+                            (void*)&pitch)) {
+          // printf("err: %s\n", SDL_GetError());
+        } else {
+          for (uint32_t i = 0; i < 0x4000; i++) {
+            uint8_t val = mmap_ppu_read(mapper, i);
+            pixels[i * 4] = 0xFF000000 | ((val >> 6) * 0x404040);
+            pixels[i * 4 + 1] = 0xFF000000 | (((val >> 4) & 0x3) * 0x404040);
+            pixels[i * 4 + 2] = 0xFF000000 | (((val >> 2) & 0x3) * 0x404040);
+            pixels[i * 4 + 3] = 0xFF000000 | ((val & 0x3) * 0x404040);
+          }
+          SDL_UnlockTexture(impl->screen_tex);
+          src.x = dest.x = 0;
+          src.y = dest.y = 0;
+          src.w = dest.w = 256;
+          src.h = dest.h = 256;
+          SDL_RenderCopy(impl->renderer, impl->screen_tex, &src, &dest);
+        }
+      }
+    } break;
+    case FT_MMC: {
+      if (mapper != NULL) {
+        uint32_t* pixels;
+        uint32_t pitch;
+        if (SDL_LockTexture(impl->screen_tex, NULL, (void**)&pixels,
+                            (void*)&pitch)) {
+          // printf("err: %s\n", SDL_GetError());
+        } else {
+          for (uint32_t i = 0; i < 0x10000; i++) {
+            pixels[i] = 0xFF000000 | (mmap_cpu_read(mapper, i) * 0x10101);
+            if (i == pc) {
+              pixels[i] = 0xFFFF0000;
+            }
+          }
+          SDL_UnlockTexture(impl->screen_tex);
+          SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, NULL);
+        }
+      }
+    } break;
+    default:
+      break;
+  }
+
+  // Render the UI
   src.x = 0;
   src.y = 32;
   src.w = 16;
   src.h = 16;
-  SDL_Rect dest;
   dest.x = 0;
   dest.y = 0;
   dest.w = 16;
@@ -133,8 +205,12 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
   if (impl->mouse_y >= 0 && impl->mouse_y < 16) {
     // Button backgrounds
     bool sel = false;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < BUTTON_NUM; i++) {
       sel = impl->mouse_x >= i * 16 && impl->mouse_x < i * 16 + 16;
+      if (i >= BUTTON_CPU && i <= BUTTON_MMC &&
+          impl->front->tab == i - BUTTON_CPU + FT_CPU) {
+        src.x = 16;
+      }
       if (sel && impl->mouse_down) {
         src.x = 16;
       }
@@ -150,7 +226,7 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
     // Button icons
     src.x = dest.x = 0;
     src.y = 48;
-    src.w = dest.w = 10 * 16;
+    src.w = dest.w = BUTTON_NUM * 16;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
   if (impl->front->sys->status != SS_NONE) {
@@ -238,7 +314,7 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
 
   // Create surface for main screen
   impl->screen_tex = SDL_CreateTexture(impl->renderer, SDL_PIXELFORMAT_ARGB8888,
-                                       SDL_TEXTUREACCESS_STREAMING, 256, 240);
+                                       SDL_TEXTUREACCESS_STREAMING, 256, 256);
   if (!impl->screen_tex) {
     fprintf(stderr, "Could not create screen texture\n");
     SDL_DestroyTexture(impl->ui);
