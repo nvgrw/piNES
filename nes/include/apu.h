@@ -78,28 +78,33 @@ typedef struct {
 
 } triangle_channel;
 
-typedef union {
-  struct {
+typedef struct {
+  union {
     struct {
       uint8_t env_per_or_volume : 4;
       uint8_t const_volume : 1;
       uint8_t loop_env_or_dis_len : 1;
       uint8_t : 2;
-    } reg1;
+    } fields;
+    uint8_t raw;
+  } reg1;
 
+  union {
     struct {
-      uint8_t noise_period : 2;
+      uint8_t noise_period : 4;
       uint8_t : 3;
       uint8_t loop_noise : 1;
-    } reg2;
+    } fields;
+    uint8_t raw;
+  } reg2;
 
+  union {
     struct {
       uint8_t : 3;
       uint8_t lenn_count_load : 5;
-    } reg3;
-  } regs;
-
-  uint8_t regs_raw;
+    } fields;
+    uint8_t raw;
+  } reg3;
 } noise_channel;
 
 typedef union {
