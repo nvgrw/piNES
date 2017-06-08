@@ -6,6 +6,33 @@
 #define STATUS 0x4015
 #define FRAME_COUNTER 0x4017
 
+#define PULSE1_REG1 0x4000
+#define PULSE1_REG2 0x4001
+#define PULSE1_REG3 0x4002
+#define PULSE1_REG4 0x4003
+
+#define PULSE2_REG1 0x4004
+#define PULSE2_REG2 0x4005
+#define PULSE2_REG3 0x4006
+#define PULSE2_REG4 0x4007
+
+#define TRIANGLE_REG1 0x4008
+#define TRIANGLE_REG2 0x400A
+#define TRIANGLE_REG3 0x400B
+
+#define NOISE_REG1 0x400C
+#define NOISE_REG2 0x400E
+#define NOISE_REG3 0x400F
+
+#define DMC_REG1 0x4010
+#define DMC_REG2 0x4011
+#define DMC_REG3 0x4012
+#define DMC_REG4 0x4013
+
+#define CONTROL 0x4015
+#define STATUS 0x4015
+#define FRAME_COUNTER 0x4017
+
 const uint8_t APU_LENGTH_TABLE[] = {
     0x0A, 0xFE, 0x14, 0x02, 0x28, 0x04, 0x50, 0x06, 0xA0, 0x08, 0x3C,
     0x0A, 0x0E, 0x0C, 0x1A, 0x0E, 0x0C, 0x10, 0x18, 0x12, 0x30, 0x14,
@@ -91,8 +118,44 @@ void apu_update_triangle(apu* apu) {
 void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {
   /*
   switch (address) {
-    case 0x4000:
-      // apu->pulse_channel[0].;
-  }
-  */
+    case PULSE1_REG1:
+      pulse_channel pulse;
+      pulse.reg1.raw = val;
+      break;
+
+    case PULSE1_REG2:
+      pulse_channel pulse;
+      pulse.reg2.raw = val;
+      break;
+
+    case PULSE1_REG3:
+      pulse_channel pulse;
+      pulse.reg3.raw = val;
+      break;
+
+    case PULSE1_REG4:
+      pulse_channel pulse;
+      pulse.reg4.raw = val;
+      break;
+
+    case PULSE2_REG1:
+      pulse_channel pulse;
+      pulse.reg1.raw = val;
+      break;
+
+    case PULSE2_REG2:
+      pulse_channel pulse;
+      pulse.reg2.raw = val;
+      break;
+
+    case PULSE2_REG3:
+      pulse_channel pulse;
+      pulse.reg3.raw = val;
+      break;
+
+    case PULSE2_REG4:
+      pulse_channel pulse;
+      pulse.reg4.raw = val;
+      break;
+      */
 }
