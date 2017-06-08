@@ -15,60 +15,42 @@ extern const uint8_t APU_DUTY_TABLE[];
 extern const uint16_t APU_NOISE_TABLE[];
 
 /* NES is little endian */
-typedef union {
-  struct {
+
+typedef struct {
+  union {
     struct {
       uint8_t envelope_period_or_volume : 4;
       uint8_t constant_volume : 1;
       uint8_t loop_or_disable_length_counter : 1;
       uint8_t duty_cycle : 2;
-    } reg1;
-
-    /* Sweep unit */
+    } fields;
+    uint8_t raw;
+  } reg1;
+  union {
     struct {
       uint8_t shift_count : 3;
       uint8_t negative : 1;
       uint8_t period : 3;
       uint8_t enabled : 1;
-    } reg2;
-
+    } fields;
+    uint8_t raw;
+  } reg2;
+  union {
     struct {
       uint8_t timer_low;
-    } reg3;
-
+    } fields;
+    uint8_t raw;
+  } reg3;
+  union {
     struct {
       uint8_t high : 3;
       uint8_t length_counter_load : 5;
-      /* also resets duty and starts envelope_period_or_volume..
-          apparently */
-    } reg4;
-  } regs;
-
-  uint8_t regs_raw;
+      //also resets duty and starts envelope_period_or_volume..
+      //    apparently
+    } fields;
+    uint8_t raw;
+  } reg4;
 } pulse_channel;
-
-/*
-typedef union {
-  struct {
-    struct {
-      uint8_t lin_count_reload_val : 7;
-      uint8_t len_count_disable : 1;
-    } reg1;
-
-    struct {
-      uint8_t timer_low;
-    } reg2;
-
-    struct {
-      uint8_t timer_high : 3;
-      uint8_t len_count_load : 5;
-    } reg3;
-
-  } regs;
-
-  uint8_t regs_raw;
-} triangle_channel;
-*/
 
 typedef struct {
   union {
