@@ -107,6 +107,7 @@ typedef struct {
   } reg3;
 } noise_channel;
 
+/*
 typedef union {
   struct {
     struct {
@@ -127,6 +128,41 @@ typedef union {
 
   } regs;
   uint8_t regs_raw;
+} dmc_channel;
+*/
+
+typedef struct {
+  union {
+    struct {
+      uint8_t freq_index : 4;
+      uint8_t : 2;
+      uint8_t loop_sample : 1;
+      uint8_t irq_enable : 1;
+    } fields;
+    uint8_t raw;
+  } reg1;
+
+  union {
+    struct {
+      uint8_t direct_load : 7;
+      uint8_t : 1;
+    } fields;
+    uint8_t raw;
+  } reg2;
+
+  union {
+    struct {
+      uint8_t sample_address;
+    } fields;
+    uint8_t raw;
+  } reg3;
+
+  union {
+    struct {
+      uint8_t sample_length;
+    } fields;
+    uint8_t raw;
+  } reg4;
 } dmc_channel;
 
 typedef struct {
