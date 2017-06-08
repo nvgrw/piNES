@@ -50,8 +50,49 @@ uint8_t apu_tnd_output(apu* apu) {
   return 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
 }
 
-uint8_t apu_cycle(apu* apu) {
+void apu_cycle(apu* apu) {
   uint8_t pulse = apu_pulses_output(apu);
   uint8_t tnd = apu_tnd_output(apu);
-  return pulse + tnd;
+
+  // apu_update_triangle(apu);
+  apu->last_buff_val = pulse + tnd;
+}
+
+void apu_update_triangle(apu* apu) {
+  uint16_t timer = apu->triangle.reg2.fields.timer_low;
+  timer += (apu->triangle.reg3.fields.timer_high << 8);
+  timer++;
+
+  /*
+  if (apu->triangle_channel.regs.reg1.len_count_disable) {
+    apu->triangle_channel.regs.reg3.len_count_load =
+        apu->triangle_channel.regs.re1.lin_count_reload_val;
+  } else {
+
+  }
+  */
+  if (apu->linear_counter_reload) {
+    apu->triangle.reg3.fields.len_count_load =
+        apu->triangle.reg1.fields.lin_count_reload_val;
+  } else {
+    if (apu->triangle.reg3.fields.len_count_load > 0) {
+      apu->triangle.reg3.fields.len_count_load--;
+    } else {
+      // TODO ??
+    }
+  }
+  if (!apu->triangle.reg1.fields.len_count_disable) {
+    apu->linear_counter_reload = 0;
+  }
+
+  // TODO finish it
+}
+
+void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {
+  /*
+  switch (address) {
+    case 0x4000:
+      // apu->pulse_channel[0].;
+  }
+  */
 }
