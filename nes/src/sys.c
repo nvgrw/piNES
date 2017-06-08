@@ -47,8 +47,7 @@ void sys_run(sys* sys, uint32_t ms) {
 
       ppu_cycle(sys->ppu);
 
-      // TODO: Call out to frontend to play sound
-      // apu cycle
+      apu_cycle(sys->apu);
 
       sys->clock -= CLOCK_PERIOD;
     }
