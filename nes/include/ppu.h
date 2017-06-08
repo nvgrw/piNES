@@ -3,6 +3,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "rom.h"
+
 /**
  * ppu.h
  * 
@@ -131,12 +133,10 @@ typedef struct {
     } flags;
     uint8_t raw;
   } status;
-  uint8_t oam_address;
 
-  // TODO: this is virtual
-  uint8_t oam_data;
-
+  // Memory
   uint8_t memory[PPU_MEMORY];
+  mapper* mapper;
 
   // Status
   uint16_t cycle;
@@ -150,6 +150,9 @@ typedef struct {
   scroll_reg t;
   uint8_t x;
   bool w;
+  bool nmi_occurred;
+  bool nmi_output;
+  bool nmi;
 
   // Palette
   uint32_t palette[32];
@@ -163,6 +166,7 @@ typedef struct {
   uint32_t bg_attr;
 
   // Sprite rendering
+  uint8_t oam_address;
   uint8_t oam[256];
   union {
     struct {
@@ -182,6 +186,7 @@ typedef struct {
 
 void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value);
 uint8_t ppu_mem_read(ppu* ppu, uint16_t address);
+uint8_t ppu_mem_read_dummy(ppu* ppu, uint16_t address);
 
 void ppu_reset(ppu* ppu);
 void ppu_power(ppu* ppu);

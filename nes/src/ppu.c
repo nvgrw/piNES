@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "ppu.h"
 
@@ -23,6 +24,7 @@ void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value) {
   switch (address) {
     case PPU_ADDR_CTRL:
       ppu->ctrl.raw = value;
+      ppu->nmi_output = ppu->ctrl.flags.nmi;
       break;
     case PPU_ADDR_MASK:
       ppu->mask.raw = value;
@@ -31,7 +33,8 @@ void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value) {
       ppu->oam_address = value;
       break;
     case PPU_ADDR_OAMDATA:
-      ppu->oam_data = value;
+      ppu->oam[ppu->oam_address] = value;
+      ppu->oam_address++;
       break;
     case PPU_ADDR_PPUSCROLL:
       if (!ppu->w) {
@@ -52,27 +55,49 @@ void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value) {
       ppu->w = !ppu->w;
       break;
     case PPU_ADDR_PPUDATA:
-      // write value to VRAM location ppu->t.raw
+      mmap_ppu_write(ppu->mapper, ppu->t.raw, value);
       ppu->t.raw += (ppu->ctrl.flags.increment ? 1 : 32);
       break;
-    case PPU_ADDR_OAMDMA:
-      // TODO: OAM write from CPU to PPU
-      break;
+    case PPU_ADDR_OAMDMA: {
+      uint8_t buf[256];
+      mmap_cpu_dma(ppu->mapper, value, buf);
+      memcpy(ppu->oam + ppu->oam_address, buf, 256 - ppu->oam_address);
+      if (ppu->oam_address) {
+        memcpy(ppu->oam, buf + (256 - ppu->oam_address), ppu->oam_address);
+      }
+    } break;
   }
 }
 
 uint8_t ppu_mem_read(ppu* ppu, uint16_t address) {
   switch (address) {
-    case PPU_ADDR_STATUS:
+    case PPU_ADDR_STATUS: {
       ppu->w = false;
+      ppu->status.flags.vblank = ppu->nmi_occurred;
+      ppu->nmi_occurred = false;
+      return ppu->status.raw;
+    }
+    case PPU_ADDR_OAMDATA:
+      // TODO: ignore when rendering
+      return ppu->oam[ppu->oam_address];
+    case PPU_ADDR_PPUDATA: {
+      uint8_t ret = mmap_ppu_read(ppu->mapper, ppu->t.raw);
+      ppu->t.raw += (ppu->ctrl.flags.increment ? 1 : 32);
+      return ret;
+    }
+  }
+  return 0;
+}
+
+uint8_t ppu_mem_read_dummy(ppu* ppu, uint16_t address) {
+  switch (address) {
+    case PPU_ADDR_STATUS:
       return ppu->status.raw;
     case PPU_ADDR_OAMADDR:
       return ppu->oam_address;
     case PPU_ADDR_OAMDATA:
-      return ppu->oam_data;
+      return mmap_ppu_read(ppu->mapper, ppu->t.raw);
     case PPU_ADDR_PPUDATA:
-      // read value from VRAM location ppu->t.raw
-      ppu->t.raw += (ppu->ctrl.flags.increment ? 1 : 32);
       return 0;
   }
   return 0;
@@ -84,6 +109,9 @@ void ppu_reset(ppu* ppu) {
   ppu->status.raw = (ppu->status.raw & 0x80);
   // oam address unchanged
   ppu->w = false;
+  ppu->nmi_occurred = false;
+  ppu->nmi_output = false;
+  ppu->nmi = false;
   ppu_mem_write(ppu, PPU_ADDR_PPUSCROLL, 0);
   ppu_mem_write(ppu, PPU_ADDR_PPUSCROLL, 0);
   // ppu->data = 0; // TODO: read buffer set to 0
@@ -121,17 +149,13 @@ ppu* ppu_init(void) {
 uint32_t mmap(ppu* ppu, uint32_t addr) {
   addr &= 0x3FFF;
   if(addr >= 0x3F00) {
+    // Palette access
     if(addr % 4 == 0) {
       addr &= 0x0F;
     }
     return ppu->palette[addr & 0x1F];
   }
-  if(addr < 0x2000) {
-    // Mapped to cartridge
-    return 0;
-  }
-  // Mapped to cartridge
-  return 0;
+  return mmap_ppu_read(ppu->mapper, addr);
 }
 
 void ppu_cycle_addr_nt(ppu* ppu) {
@@ -184,12 +208,12 @@ void ppu_cycle(ppu* ppu) {
       break;
     case 241:
       if (ppu->cycle == 1) {
-        ppu->status.flags.vblank = 1;
+        ppu->nmi_occurred = true;
       }
       break;
     case 261:
       if (ppu->cycle == 1) {
-        ppu->status.flags.vblank = 0;
+        ppu->nmi_occurred = false;
       }
       break;
   }

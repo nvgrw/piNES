@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "mappers.h"
+#include "ppu.h"
 
 #define HEADER_SIZE 16
 #define TRAINER_SIZE 512
@@ -146,6 +147,11 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
 
   fclose(fp);
 
+  // Pre-initialise RAM
+  for (uint16_t i = 0; i < 0x800; i++) {
+    ret->memory->ram[i] = (i & 4) ? 0xFF : 0x00;
+  }
+
   // Set up the mapped memory with some defaults
   ret->mapped.ram = ret->memory->ram;
   ret->mapped.registers = ret->memory->registers;
@@ -154,14 +160,10 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   ret->mapped.prg_rom1 = ret->memory->prg_rom;
   ret->mapped.prg_rom2 = ret->memory->prg_rom + MC_PRG_ROM_SIZE;
   ret->mapped.ppu_pattable0 = ret->memory->chr_rom;
-  ret->mapped.ppu_pattable1 =
-      ret->mapped.ppu_pattable0 + MC_PATTABLE_SIZE;
-  ret->mapped.ppu_nametable0 =
-      ret->mapped.ppu_pattable1 + MC_PATTABLE_SIZE;
-  ret->mapped.ppu_nametable1 =
-      ret->mapped.ppu_nametable0 + MC_NAMETABLE_SIZE;
-  ret->mapped.ppu_palettes =
-      ret->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
+  ret->mapped.ppu_pattable1 = ret->mapped.ppu_pattable0 + MC_PATTABLE_SIZE;
+  ret->mapped.ppu_nametable0 = ret->memory->vram;
+  ret->mapped.ppu_nametable1 = ret->mapped.ppu_nametable0 + MC_NAMETABLE_SIZE;
+  //ret->mapped.ppu_palettes = ret->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
 
   if (rom_get_mapper_number(ret) != 0) {
     return RE_UNKNOWN_MAPPER;
@@ -266,18 +268,82 @@ bool rom_has_bus_conflicts(mapper* mapper) {
   return false;
 }
 
+/*
+void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
+  if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
+    ppu_mem_write((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE, val);
+    return;
+  }
+}
+uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
+  if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
+    return ppu_mem_read_dummy((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE);
+  }
+  return 0;
+}
+*/
+void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
+  if (address >= 0x3000 && address < 0x3F00) {
+    address -= 0x1000;
+  }
+  if (address < 0x2000) {
+    mapper->mapped.ppu_pattable0[address - MC_PATTABLE0_BASE] = val;
+    return;
+  }
+  if (address >= 0x3F00) {
+    ((ppu*)mapper->ppu)->palette[address & 0x1F] = val;
+    return;
+  }
+  // Nametable
+  mirror_type mt = rom_get_mirror_type(mapper);
+  uint8_t* nametable = mapper->mapped.ppu_nametable0;
+  if (address >= MC_NAMETABLE1_BASE && address < MC_NAMETABLE1_UPPER &&
+      mt == MIRRORTYPE_VERTICAL) {
+    nametable = mapper->mapped.ppu_nametable1;
+  } else if (address >= MC_NAMETABLE2_BASE && address < MC_NAMETABLE2_UPPER &&
+             mt == MIRRORTYPE_HORIZONTAL) {
+    nametable = mapper->mapped.ppu_nametable1;
+  } else if (address >= MC_NAMETABLE3_BASE && address < MC_NAMETABLE3_UPPER &&
+             mt == MIRRORTYPE_VERTICAL) {
+    nametable = mapper->mapped.ppu_nametable1;
+  }
+  nametable[address & 0x3FF] = val;
+}
+uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
+  if (address >= 0x3000 && address < 0x3F00) {
+    address -= 0x1000;
+  }
+  if (address < 0x2000) {
+    return mapper->mapped.ppu_pattable0[address - MC_PATTABLE0_BASE];
+  }
+  if (address >= 0x3F00) {
+    return ((ppu*)mapper->ppu)->palette[address & 0x1F];
+  }
+  // Nametable
+  mirror_type mt = rom_get_mirror_type(mapper);
+  uint8_t* nametable = mapper->mapped.ppu_nametable0;
+  if (address >= MC_NAMETABLE1_BASE && address < MC_NAMETABLE1_UPPER &&
+      mt == MIRRORTYPE_VERTICAL) {
+    nametable = mapper->mapped.ppu_nametable1;
+  } else if (address >= MC_NAMETABLE2_BASE && address < MC_NAMETABLE2_UPPER &&
+             mt == MIRRORTYPE_HORIZONTAL) {
+    nametable = mapper->mapped.ppu_nametable1;
+  } else if (address >= MC_NAMETABLE3_BASE && address < MC_NAMETABLE3_UPPER &&
+             mt == MIRRORTYPE_VERTICAL) {
+    nametable = mapper->mapped.ppu_nametable1;
+  }
+  return nametable[address & 0x3FF];
+}
+
 // Memory access functions
 void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
     mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE] = val;
     return;
   }
-  if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
-    // mapper->mapped
-    //     .ppu_ctrl_regs[(address - MC_PPU_CTRL_BASE) %
-    //     PPU_CTRL_REGISTERS_SIZE] =
-    //     val;
-    // TODO: Handle mirroring
+  if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
+      address == 0x4014) {
+    ppu_mem_write((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE, val);
     return;
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
@@ -295,47 +361,54 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
 }
 
 uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
-  printf("mmap cpu read: %d\n", address);
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
-    printf("A\n");
     return mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE];
   }
-  if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
-      printf("B\n");
-    // return mapper->mapped
-    //     .ppu_ctrl_regs[(address - MC_PPU_CTRL_BASE) %
-    //     PPU_CTRL_REGISTERS_SIZE];
-    // TODO: Handle mirroring
-    return 0;
+  if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
+      address == 0x4014) {
+    return ppu_mem_read_dummy((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE);
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
-    printf("C\n");
-    return mapper->mapped.registers[address - MC_REGISTERS_BASE];
+    return 0; //mapper->mapped.registers[address - MC_REGISTERS_BASE];
   }
+  return mapper->mapped.prg_rom1[address % 0x4000];
+  /*
   if (address >= MC_CART_EXPANSION_ROM_BASE &&
       address < MC_CART_EXPANSION_ROM_UPPER) {
-    printf("D\n");
+    return 0;
     return mapper->mapped
         .cart_expansion_rom[address - MC_CART_EXPANSION_ROM_BASE];
   }
   if (address >= MC_SRAM_BASE && address < MC_SRAM_UPPER) {
-    printf("E\n");
+    return 0;
     return mapper->mapped.sram[address - MC_SRAM_BASE];
   }
   if (address >= MC_PRG_ROM1_BASE && address < MC_PRG_ROM1_UPPER) {
-    printf("F\n");
     return mapper->mapped.prg_rom1[address - MC_PRG_ROM1_BASE];
   }
   if (address >= MC_PRG_ROM2_BASE && address <= MC_PRG_ROM2_UPPER) {
-    printf("G\n");
+    return 0;
     return mapper->mapped.prg_rom2[address - MC_PRG_ROM2_BASE];
   }
-  printf("H\n");
 
   return MAPPERS[rom_get_mapper_number(mapper)].cpu_read(mapper, address);
+  */
 }
 
+void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf) {
+  uint16_t cur = address * 0x100;
+  for (uint16_t i = 0; i < 256; i++) {
+    buf[i] = mmap_cpu_read(mapper, cur);
+    cur++;
+  }
+}
+
+/*
 void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
+  if (address >= 0x3000 && address < 0x3000 + 0xF00) {
+    address -= 0x1000;
+  }
+
   if (address >= MC_PATTABLE0_BASE && address <= MC_PATTABLE0_UPPER) {
     mapper->mapped.ppu_pattable0[address - MC_PATTABLE0_BASE] = val;
     return;
@@ -374,15 +447,14 @@ void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
     return;
   }
 
-  if (address >= 0x3000 && address < 0x3000 + 0xF00) {
-    mmap_ppu_write(mapper, address - 0x1000, val);
-    return;
-  }
-
   MAPPERS[rom_get_mapper_number(mapper)].ppu_write(mapper, address, val);
 }
 
 uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
+  if (address >= 0x3000 && address < 0x3000 + 0xF00) {
+    address -= 0x1000;
+  }
+
   if (address >= MC_PATTABLE0_BASE && address <= MC_PATTABLE0_UPPER) {
     return mapper->mapped.ppu_pattable0[address - MC_PATTABLE0_BASE];
   }
@@ -415,9 +487,7 @@ uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
     }
   }
 
-  if (address >= 0x3000 && address < 0x3000 + 0xF00) {
-    return mmap_ppu_read(mapper, address - 0x1000);
-  }
-
   return MAPPERS[rom_get_mapper_number(mapper)].ppu_read(mapper, address);
 }
+
+*/

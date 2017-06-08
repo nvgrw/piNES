@@ -15,8 +15,8 @@ sys* sys_init(void) {
   ret->clock = 0.0;
   ret->cpu = cpu_init();
   ret->ppu = ppu_init();
-  ret->mapper = NULL;
   //ret->apu = apu_init();
+  ret->mapper = NULL;
   ret->region = R_NTSC;
   ret->status = SS_NONE;
   ret->running = false;
@@ -32,17 +32,12 @@ sys* sys_init(void) {
 void sys_run(sys* sys, uint32_t ms) {
   if (sys->running) {
     sys->clock += ms;
-    uint8_t cpu_busy = 0;
     while (sys->clock >= CLOCK_PERIOD && sys->running) {
-      // cpu cycle
-      if (!cpu_busy) {
-        cpu_busy += cpu_cycle(sys->cpu) * 3;
-        if (!cpu_busy) {
-          // Trapped, stop execution
-          sys->running = false;
-        }
+      cpu_nmi(sys->cpu, sys->ppu->nmi);
+      if (cpu_cycle(sys->cpu)) {
+        // Trapped, stop execution
+        sys->running = false;
       }
-      cpu_busy--;
 
       ppu_cycle(sys->ppu);
 
@@ -72,8 +67,10 @@ void sys_rom(sys* sys, char* path) {
       break;
   }
   if (sys->mapper != NULL) {
-    // TODO: refactor CPU
     sys->cpu->mapper = sys->mapper;
+    sys->ppu->mapper = sys->mapper;
+    sys->mapper->cpu = sys->cpu;
+    sys->mapper->ppu = sys->ppu;
   }
 }
 

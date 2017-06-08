@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #define WORK_RAM_SIZE 0x800
+#define VIDEO_RAM_SIZE 0x800
 #define REGISTERS_SIZE 0x20
 #define CART_EXPANSION_ROM_SIZE 0x1FDF
 #define SRAM_SIZE 0x2000
@@ -128,6 +129,7 @@ typedef struct {
   uint8_t* prg_ram;  // NULL if not present
 
   // PPU
+  uint8_t vram[VIDEO_RAM_SIZE];
   uint8_t* chr_rom;  // NULL if not present
   uint8_t* chr_ram;  // NULL if not present
 } memory;
@@ -151,8 +153,11 @@ typedef struct {
     uint8_t* ppu_pattable1;
     uint8_t* ppu_nametable0;
     uint8_t* ppu_nametable1;
-    uint8_t* ppu_palettes;
+    //uint8_t* ppu_palettes;
   } mapped;
+
+  void* cpu;
+  void* ppu;
 } mapper;
 
 /*
@@ -198,21 +203,14 @@ bool rom_has_persistent_memory(mapper* mapper);
 bool rom_has_bus_conflicts(mapper* mapper);
 
 /**
- * CPU writes
+ * Read / write from within the CPU
  */
 void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val);
-
-/**
- * CPU reads
- */
 uint8_t mmap_cpu_read(mapper* mapper, uint16_t address);
+void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf);
 
 /**
- * CHR ROM/RAM writes
+ * Read / write from within the PPU
  */
 void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val);
-
-/**
- * CHR ROM/RAM reads
- */
 uint8_t mmap_ppu_read(mapper* mapper, uint16_t address);

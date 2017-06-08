@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "cpu.h"
@@ -18,10 +19,22 @@ cpu* cpu_init() {
   return ret;
 }
 
+void cpu_nmi(cpu* cpu, bool nmi) {
+  if (nmi && !cpu->nmi_detected) {
+    cpu->nmi_detected = true;
+    cpu->nmi_pending = true;
+  } else if (!nmi) {
+    cpu->nmi_detected = false;
+  }
+}
+
 void cpu_reset(cpu* cpu) {
   cpu->register_status.raw = STATUS_DEFAULT;
   cpu->stack_pointer = STACK_DEFAULT;
   cpu->last_interrupt = INTRT_NONE;
+  cpu->busy = 7;
+  cpu->nmi_detected = false;
+  cpu->nmi_pending = false;
 
   // Reset on power on (not done for tests)
   cpu_interrupt(cpu, INTRT_RESET);
@@ -35,17 +48,31 @@ void cpu_deinit(cpu* cpu) {
 void perform_irq(cpu* cpu);
 void perform_nmi(cpu* cpu);
 
-uint8_t cpu_cycle(cpu* cpu) {
+bool cpu_cycle(cpu* cpu) {
+  // Cycle only if not busy
+  if (cpu->busy) {
+    cpu->busy--;
+    return false;
+  }
+
+  if (cpu->nmi_pending) {
+    printf("nmi\n");
+    cpu->nmi_pending = false;
+    cpu_interrupt(cpu, INTRT_NMI);
+  }
+
   // Handle interrupts
   switch (cpu->last_interrupt) {
     case INTRT_IRQ:
       perform_irq(cpu);
       cpu->last_interrupt = INTRT_NONE;
-      return 7;
+      cpu->busy = 7;
+      return false;
     case INTRT_NMI:
       perform_nmi(cpu);
       cpu->last_interrupt = INTRT_NONE;
-      return 7;
+      cpu->busy = 7;
+      return false;
     default:
       break;
   }
@@ -151,6 +178,11 @@ uint8_t cpu_cycle(cpu* cpu) {
   uint16_t last_program_counter = cpu->program_counter;
   cpu->program_counter += bytes_used;
   cpu->branch_taken = false;
+  if (instr.implementation == NULL) {
+    printf("!!! UNSUPPORTED INSTRUCTION !!!\n");
+    dbg_print_state(cpu);
+    return true;
+  }
   instr.implementation(cpu, address);
 
   cpu->addressing_special = false;
@@ -159,11 +191,12 @@ uint8_t cpu_cycle(cpu* cpu) {
   if (cpu->program_counter == last_program_counter) {
     printf("!!! CPU TRAPPED !!!\n");
     dbg_print_state(cpu);
-    return 0;
+    return true;
   }
 
-  return instr.cycles + (instr.cycle_cross && page_crossed ? 1 : 0) +
-         (instr.cycle_branch && cpu->branch_taken ? 1 : 0);
+  cpu->busy += instr.cycles + (instr.cycle_cross && page_crossed ? 1 : 0) +
+               (instr.cycle_branch && cpu->branch_taken ? 1 : 0);
+  return false;
 }
 
 /* Utilities */

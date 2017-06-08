@@ -20,7 +20,11 @@
  */
 typedef enum {
   FT_SCREEN,
-  FT_CPU
+  FT_CPU,
+  FT_PPU,
+  FT_APU,
+  FT_IO,
+  FT_MMC
 } front_tab;
 
 /**

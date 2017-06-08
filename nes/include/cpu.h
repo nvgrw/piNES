@@ -65,14 +65,18 @@ typedef struct {
   bool trap;
   bool addressing_special;
   bool branch_taken;
+  bool nmi_detected;
+  bool nmi_pending;
+  uint32_t busy;
   interrupt_type last_interrupt;
 } cpu;
 
 // Functions
 cpu* cpu_init();
+void cpu_nmi(cpu* cpu, bool nmi);
 void cpu_reset(cpu* cpu);
 void cpu_deinit(cpu* cpu);
-uint8_t cpu_cycle(cpu* cpu);
+bool cpu_cycle(cpu* cpu);
 
 // Utilities
 uint8_t cpu_mem_read8(cpu* cpu, uint16_t address);
