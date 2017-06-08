@@ -4,9 +4,7 @@
  * region.c
  */
 
-uint32_t region_screen_width(region region) {
-  return 256;
-}
+uint32_t region_screen_width(region region) { return 256; }
 
 uint32_t region_screen_height(region region) {
   switch (region) {
@@ -19,4 +17,6 @@ uint32_t region_screen_height(region region) {
     case R_DENDY:
       return 239;
   }
+  // FIXME: Control reaches end of non-void function
+  return 0;
 }

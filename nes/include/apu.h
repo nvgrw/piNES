@@ -7,6 +7,13 @@
 /* using dummy memory for now
 until the cpu is done */
 
+/**
+ * Lookup tables for the channels
+ */
+extern const uint8_t APU_LENGTH_TABLE[];
+extern const uint8_t APU_DUTY_TABLE[];
+extern const uint16_t APU_NOISE_TABLE[];
+
 /* NES is little endian */
 typedef union {
   struct {
