@@ -50,15 +50,17 @@ uint8_t apu_pulse0_output(apu* apu) { return -1; }
 
 uint8_t apu_pulse1_output(apu* apu) { return -1; }
 
-// These formulae are linear approximations
 uint8_t apu_pulses_output(apu* apu) {
+  // These formulae are linear approximations
   uint8_t pulse0 = apu_pulse0_output(apu);
   uint8_t pulse1 = apu_pulse1_output(apu);
   return 0.00752 * (pulse0 + pulse1);
 }
 
 uint8_t apu_triangle_output(apu* apu) { return -1; }
+
 uint8_t apu_noise_output(apu* apu) { return -1; }
+
 uint8_t apu_dmc_output(apu* apuc) { return -1; }
 
 uint8_t apu_tnd_output(apu* apu) {
@@ -88,10 +90,7 @@ void apu_cycle(apu* apu, void* context,
 
   apu->cycle_count = 2;
 
-  // uint8_t pulse = apu_pulses_output(apu);
-  // uint8_t tnd = apu_tnd_output(apu);
-
-  uint8_t val = 0;
+  uint8_t val = apu_pulses_output(apu) + apu_tnd_output(apu);
 
   // Skip samples/ downsample
   if (apu->sample_skips <= 1.0) {
