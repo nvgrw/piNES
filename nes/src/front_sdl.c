@@ -249,9 +249,6 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
 
 void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len) {
   front_sdl_impl* impl = (front_sdl_impl*)context;
-  uint32_t queued_size = SDL_GetQueuedAudioSize(impl->audio_device);
-  printf("Enqueued prior to copy: %d\n", queued_size);
-
   SDL_QueueAudio(impl->audio_device, buffer, len);
 }
 

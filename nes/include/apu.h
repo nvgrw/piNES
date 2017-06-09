@@ -6,7 +6,7 @@
 
 #include "rom.h"
 
-#define AUDIO_BUFFER_SIZE 8192
+#define AUDIO_BUFFER_SIZE 256
 
 /**
  * Lookup tables for the channels
@@ -193,6 +193,7 @@ typedef struct {
   uint8_t buffer[AUDIO_BUFFER_SIZE];
   int buffer_cursor;
   double cntr;
+  int ocntr;
 } apu;
 
 /**

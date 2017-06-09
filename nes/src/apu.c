@@ -79,8 +79,12 @@ void apu_cycle(apu* apu) {
   // uint8_t pulse = apu_pulses_output(apu);
   // uint8_t tnd = apu_tnd_output(apu);
 
-  uint8_t val = 128 + (uint8_t)(127 * sin(apu->cntr));
+  uint8_t val = apu->ocntr <= 50000 ? 128 : 0 + (int8_t)(127 * sin(apu->cntr));
   apu_write_to_buffer(apu, val);
   apu->cntr += 0.01f;
   if (apu->cntr >= 1.0) apu->cntr = -1.0;
+  apu->ocntr++;
+  if (apu->ocntr >= 100000) {
+    apu->ocntr = 0;
+  }
 }
