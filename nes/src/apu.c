@@ -91,9 +91,7 @@ void apu_cycle(apu* apu, void* context,
   // uint8_t pulse = apu_pulses_output(apu);
   // uint8_t tnd = apu_tnd_output(apu);
 
-  uint8_t val = 128 + 127 * apu->cntr;
-  apu->cntr += 0.00009f;
-  if (apu->cntr >= 1.0) apu->cntr = 0.0;
+  uint8_t val = 0;
 
   // Skip samples/ downsample
   if (apu->sample_skips <= 1.0) {
