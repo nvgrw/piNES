@@ -92,7 +92,7 @@ void apu_cycle(apu* apu, void* context,
   // uint8_t tnd = apu_tnd_output(apu);
 
   uint8_t val = 128 + 127 * apu->cntr;
-  apu->cntr += 0.000001f;
+  apu->cntr += 0.00009f;
   if (apu->cntr >= 1.0) apu->cntr = 0.0;
 
   // Skip samples/ downsample
