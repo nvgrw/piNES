@@ -6,6 +6,8 @@
 
 #include "rom.h"
 
+#define APU_SAMPLE_RATE 1789800.0
+#define APU_ACTUAL_SAMPLE_RATE 44100
 #define AUDIO_BUFFER_SIZE 256
 
 /**
@@ -190,10 +192,12 @@ typedef struct {
   mapper* mapper;
 
   bool linear_counter_reload;
+  uint8_t cycle_count;
+  double sample_skips;
   uint8_t buffer[AUDIO_BUFFER_SIZE];
   int buffer_cursor;
+
   double cntr;
-  int ocntr;
 } apu;
 
 /**
@@ -210,4 +214,5 @@ void apu_mem_write(apu* apu, uint16_t address, uint8_t val);
 /**
  * General output methods
  */
-void apu_cycle(apu* apu);
+void apu_cycle(apu* apu, void* context,
+               void (*enqueue_audio)(void* context, uint8_t* buffer, int len));

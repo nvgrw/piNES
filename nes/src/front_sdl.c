@@ -334,10 +334,9 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
 
   // Initialise audio
   SDL_AudioSpec audio_want, audio_have;
-  audio_want.freq =
-      44100;  // TODO: This can probably be reduced to CPU freq / 2
+  audio_want.freq = APU_ACTUAL_SAMPLE_RATE;
   audio_want.format = AUDIO_U8;
-  audio_want.samples = 256;
+  audio_want.samples = 512;
   audio_want.callback = NULL;
   audio_want.channels = 1;
   audio_want.userdata = impl;

@@ -72,19 +72,37 @@ void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {}
 
 void apu_write_to_buffer(apu* apu, uint8_t value) {
   apu->buffer[apu->buffer_cursor] = value;
-  apu->buffer_cursor = (apu->buffer_cursor + 1) % AUDIO_BUFFER_SIZE;
+  apu->buffer_cursor++;
+  apu->buffer_cursor = apu->buffer_cursor % AUDIO_BUFFER_SIZE;
 }
 
-void apu_cycle(apu* apu) {
+void apu_cycle(apu* apu, void* context,
+               void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
+  // This function is called at the rate of the PPU. Only do something useful
+  // every 3 cycles.
+
+  if (apu->cycle_count != 0) {
+    apu->cycle_count--;
+    return;
+  }
+
+  apu->cycle_count = 2;
+
   // uint8_t pulse = apu_pulses_output(apu);
   // uint8_t tnd = apu_tnd_output(apu);
 
-  uint8_t val = apu->ocntr <= 50000 ? 128 : 0 + (int8_t)(127 * sin(apu->cntr));
-  apu_write_to_buffer(apu, val);
-  apu->cntr += 0.01f;
-  if (apu->cntr >= 1.0) apu->cntr = -1.0;
-  apu->ocntr++;
-  if (apu->ocntr >= 100000) {
-    apu->ocntr = 0;
+  uint8_t val = 128 + 127 * apu->cntr;
+  apu->cntr += 0.000001f;
+  if (apu->cntr >= 1.0) apu->cntr = 0.0;
+
+  // Skip samples/ downsample
+  if (apu->sample_skips <= 1.0) {
+    apu_write_to_buffer(apu, val);
+    if (apu->buffer_cursor == 0) {
+      enqueue_audio(context, apu->buffer, AUDIO_BUFFER_SIZE);
+    }
+    apu->sample_skips += APU_SAMPLE_RATE / APU_ACTUAL_SAMPLE_RATE;
+  } else {
+    apu->sample_skips -= 1.0;
   }
 }
