@@ -196,6 +196,8 @@ typedef struct {
   double sample_skips;
   uint8_t buffer[AUDIO_BUFFER_SIZE];
   int buffer_cursor;
+  int frequency_select;
+  int frequency_change_counter;
 
   double cntr;
 } apu;

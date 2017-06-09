@@ -76,6 +76,9 @@ void apu_write_to_buffer(apu* apu, uint8_t value) {
   apu->buffer_cursor = apu->buffer_cursor % AUDIO_BUFFER_SIZE;
 }
 
+static float FREQUENCIES[] = {0.004, 0.005, 0.006, 0.005,
+                              0.004, 0.003, 0.002, 0.003};
+
 void apu_cycle(apu* apu, void* context,
                void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
   // This function is called at the rate of the PPU. Only do something useful
@@ -88,12 +91,21 @@ void apu_cycle(apu* apu, void* context,
 
   apu->cycle_count = 2;
 
-  // uint8_t pulse = apu_pulses_output(apu);
-  // uint8_t tnd = apu_tnd_output(apu);
+// uint8_t pulse = apu_pulses_output(apu);
+// uint8_t tnd = apu_tnd_output(apu);
 
-  uint8_t val = 128 + 127 * apu->cntr;
-  apu->cntr += 0.00009f;
-  if (apu->cntr >= 1.0) apu->cntr = 0.0;
+#define PI 3.14159
+  uint8_t val = 128 + 127 * sin(apu->cntr);
+  apu->cntr += FREQUENCIES[apu->frequency_select];
+  if (apu->cntr >= PI) apu->cntr = -PI;
+
+  if (apu->frequency_change_counter <= 0) {
+    apu->frequency_select =
+        (apu->frequency_select + 1) % (sizeof(FREQUENCIES) / sizeof(float));
+    apu->frequency_change_counter = 1000000;
+  } else {
+    apu->frequency_change_counter--;
+  }
 
   // Skip samples/ downsample
   if (apu->sample_skips <= 1.0) {
