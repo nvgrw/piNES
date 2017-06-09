@@ -1,4 +1,5 @@
 #include "apu.h"
+#include <math.h>
 #include <stdio.h>
 
 #define START_CHANNELS 0x4000
@@ -67,42 +68,19 @@ uint8_t apu_tnd_output(apu* apu) {
   return 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
 }
 
-void apu_update_triangle(apu* apu) {
-  uint16_t timer = apu->triangle.reg2.fields.timer_low;
-  timer += (apu->triangle.reg3.fields.timer_high << 8);
-  timer++;
-
-  /*
-  if (apu->triangle_channel.regs.reg1.len_count_disable) {
-    apu->triangle_channel.regs.reg3.len_count_load =
-        apu->triangle_channel.regs.re1.lin_count_reload_val;
-  } else {
-
-  }
-  */
-  if (apu->linear_counter_reload) {
-    apu->triangle.reg3.fields.len_count_load =
-        apu->triangle.reg1.fields.lin_count_reload_val;
-  } else {
-    if (apu->triangle.reg3.fields.len_count_load > 0) {
-      apu->triangle.reg3.fields.len_count_load--;
-    } else {
-      // TODO ??
-    }
-  }
-  if (!apu->triangle.reg1.fields.len_count_disable) {
-    apu->linear_counter_reload = 0;
-  }
-
-  // TODO finish it
-}
-
 void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {}
 
-void apu_cycle(apu* apu) {
-  uint8_t pulse = apu_pulses_output(apu);
-  uint8_t tnd = apu_tnd_output(apu);
+void apu_write_to_buffer(apu* apu, uint8_t value) {
+  apu->buffer[apu->buffer_cursor] = value;
+  apu->buffer_cursor = (apu->buffer_cursor + 1) % AUDIO_BUFFER_SIZE;
+}
 
-  // apu_update_triangle(apu);
-  apu->last_buff_val = pulse + tnd;
+void apu_cycle(apu* apu) {
+  // uint8_t pulse = apu_pulses_output(apu);
+  // uint8_t tnd = apu_tnd_output(apu);
+
+  uint8_t val = 128 + (uint8_t)(127 * sin(apu->cntr));
+  apu_write_to_buffer(apu, val);
+  apu->cntr += 0.01f;
+  if (apu->cntr >= 1.0) apu->cntr = -1.0;
 }

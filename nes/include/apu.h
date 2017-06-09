@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "rom.h"
+
+#define AUDIO_BUFFER_SIZE 8192
+
 /**
  * Lookup tables for the channels
  * TODO: May not actually need to be externed
@@ -23,6 +27,7 @@ typedef struct {
     } fields;
     uint8_t raw;
   } reg1;
+
   union {
     struct {
       uint8_t shift_count : 3;
@@ -32,22 +37,22 @@ typedef struct {
     } fields;
     uint8_t raw;
   } reg2;
+
   union {
     struct {
       uint8_t timer_low;
     } fields;
     uint8_t raw;
   } reg3;
+
   union {
     struct {
       uint8_t high : 3;
       uint8_t length_counter_load : 5;
-      // also resets duty and starts envelope_period_or_volume..
-      //    apparently
     } fields;
     uint8_t raw;
   } reg4;
-} pulse_channel;
+} apu_pulse_channel;
 
 typedef struct {
   union {
@@ -73,7 +78,7 @@ typedef struct {
     uint8_t raw;
   } reg3;
 
-} triangle_channel;
+} apu_triangle_channel;
 
 typedef struct {
   union {
@@ -102,31 +107,7 @@ typedef struct {
     } fields;
     uint8_t raw;
   } reg3;
-} noise_channel;
-
-/*
-typedef union {
-  struct {
-    struct {
-      uint8_t freq_index : 4;
-      uint8_t : 2;
-      uint8_t loop_sample : 1;
-      uint8_t irq_enable : 1;
-    } reg1;
-
-    struct {
-      uint8_t direct_load : 7;
-      uint8_t : 1;
-    } reg2;
-
-    struct {
-      uint8_t sample_address;
-    } reg3;
-
-  } regs;
-  uint8_t regs_raw;
-} dmc_channel;
-*/
+} apu_noise_channel;
 
 typedef struct {
   union {
@@ -160,30 +141,30 @@ typedef struct {
     } fields;
     uint8_t raw;
   } reg4;
-} dmc_channel;
+} apu_dmc_channel;
 
 typedef struct {
   uint8_t pulse1 : 1;
   uint8_t pulse2 : 1;
   uint8_t triangle : 1;
   uint8_t noise : 1;
-} len_count_enable;
+} apu_len_count_enable;
 
 typedef union {
   union {
-    len_count_enable len_count_enable;
+    apu_len_count_enable len_count_enable;
     uint8_t dmc_enable : 1;
   } fields;
   uint8_t raw;
-} control;
+} apu_control;
 
 typedef union {
   union {
-    len_count_enable len_count_enable;
+    apu_len_count_enable len_count_enable;
     uint8_t dmc_interrupt : 1;
   } fields;
   uint8_t raw;
-} status;
+} apu_status;
 
 typedef union {
   struct {
@@ -196,20 +177,22 @@ typedef union {
 } frame_counter;
 
 typedef struct {
-  pulse_channel pulse[2];
-  triangle_channel triangle;
-  noise_channel noise;
-  dmc_channel dmc;
+  // pulse_channel pulse[2];
+  // triangle_channel triangle;
+  // noise_channel noise;
+  // dmc_channel dmc;
 
-  control control;
-  status status;
+  // control control;
+  // status status;
 
-  frame_counter frame_counter;
+  // frame_counter frame_counter;
 
   mapper* mapper;
 
   bool linear_counter_reload;
-  uint8_t last_buff_val;
+  uint8_t buffer[AUDIO_BUFFER_SIZE];
+  int buffer_cursor;
+  double cntr;
 } apu;
 
 /**

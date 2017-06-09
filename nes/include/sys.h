@@ -37,8 +37,8 @@ typedef struct {
 
 sys* sys_init(void);
 
-void sys_run(sys* sys, uint32_t ms);
-void sys_audio_callback(sys* sys, uint8_t* stream, int len);
+void sys_run(sys* sys, uint32_t ms, void* context,
+             void (*enqueue_audio)(void* context, uint8_t* buffer, int len));
 
 void sys_rom(sys* sys, char* path);
 void sys_start(sys* sys);

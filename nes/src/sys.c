@@ -30,7 +30,8 @@ sys* sys_init(void) {
 #define PPU_CYCLES_PER_SECOND (CLOCKS_PER_SECOND / 4.0)
 #define CLOCK_PERIOD (4.0 / CLOCKS_PER_MILLISECOND)
 
-void sys_run(sys* sys, uint32_t ms) {
+void sys_run(sys* sys, uint32_t ms, void* context,
+             void (*enqueue_audio)(void* context, uint8_t* bufer, int len)) {
   if (sys->running) {
     sys->clock += ms;
     while (sys->clock >= CLOCK_PERIOD && sys->running) {
@@ -43,15 +44,12 @@ void sys_run(sys* sys, uint32_t ms) {
       ppu_cycle(sys->ppu);
 
       apu_cycle(sys->apu);
+      if (sys->apu->buffer_cursor == 0) {
+        enqueue_audio(context, sys->apu->buffer, AUDIO_BUFFER_SIZE);
+      }
 
       sys->clock -= CLOCK_PERIOD;
     }
-  }
-}
-
-void sys_audio_callback(sys* sys, uint8_t* stream, int len) {
-  for (int i = 0; i < len; i++) {
-    stream[i] = sys->apu->last_buff_val;
   }
 }
 

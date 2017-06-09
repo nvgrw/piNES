@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "apu.h"
 #include "error.h"
 #include "front.h"
 #include "front_sdl.h"
@@ -41,6 +42,8 @@ void front_sdl_impl_deinit(front_sdl_impl* impl) {
   free(impl);
 }
 
+void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len);
+
 void front_sdl_impl_run(front_sdl_impl* impl) {
   bool running = true;
   uint32_t last_tick = SDL_GetTicks();
@@ -75,9 +78,11 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
                 }
               } break;
               case BUTTON_START:
+                SDL_PauseAudioDevice(impl->audio_device, false);
                 sys_start(sys);
                 break;
               case BUTTON_STOP:
+                SDL_PauseAudioDevice(impl->audio_device, true);
                 sys_stop(sys);
                 break;
               case BUTTON_PAUSE:
@@ -108,7 +113,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
       }
     }
     uint32_t this_tick = SDL_GetTicks();
-    sys_run(sys, this_tick - last_tick);
+    sys_run(sys, this_tick - last_tick, impl, front_sdl_impl_audio_enqueue);
     last_tick = this_tick;
     if (sys->running && impl->front->tab == FT_SCREEN) {
       // If the system is running, flip on demand
@@ -242,8 +247,12 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
   SDL_RenderClear(impl->renderer);
 }
 
-void front_sdl_impl_audio_callback(void* userdata, Uint8* stream, int len) {
-  sys_audio_callback(((front_sdl_impl*)userdata)->front->sys, stream, len);
+void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len) {
+  front_sdl_impl* impl = (front_sdl_impl*)context;
+  uint32_t queued_size = SDL_GetQueuedAudioSize(impl->audio_device);
+  printf("Enqueued prior to copy: %d\n", queued_size);
+
+  SDL_QueueAudio(impl->audio_device, buffer, len);
 }
 
 /**
@@ -332,7 +341,7 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
       44100;  // TODO: This can probably be reduced to CPU freq / 2
   audio_want.format = AUDIO_U8;
   audio_want.samples = 256;
-  audio_want.callback = front_sdl_impl_audio_callback;
+  audio_want.callback = NULL;
   audio_want.channels = 1;
   audio_want.userdata = impl;
 
@@ -343,8 +352,6 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
     free(impl);
     return NULL;
   }
-
-  SDL_PauseAudioDevice(impl->audio_device, false);
 
   impl->front = front;
   return impl;
