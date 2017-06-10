@@ -3,7 +3,13 @@ project (nes)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -D_POSIX_SOURCE -D_BSD_SOURCE -D_THREAD_SAFE -std=c99 -Werror -pedantic")
+option (IS_PI "IS_PI" OFF)
+
+if(IS_PI)
+  set (EXTRA_FLAGS "-DIS_PI")
+endif()
+
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -D_POSIX_SOURCE -D_BSD_SOURCE -D_THREAD_SAFE ${EXTRA_FLAGS} -std=c99 -Werror -pedantic")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
 file (GLOB SOURCES "src/*.c" "include/*.h")

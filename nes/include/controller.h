@@ -32,3 +32,5 @@ void controller_deinit(void);
 
 void controller_poll(controller_state* cntrl1_state,
                      controller_state* cntrl2_state);
+
+inline bool has_controller_available(void);

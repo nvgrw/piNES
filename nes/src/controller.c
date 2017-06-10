@@ -1,6 +1,9 @@
-#include <pigpio.h>
 #include <stdbool.h>
 #include <stdlib.h>
+
+#ifdef IS_PI
+#include <pigpio.h>
+#endif
 
 #include "controller.h"
 
@@ -9,6 +12,7 @@
 // #define LATCH_WAIT 1667 - LATCH_DURATION - PULSE_HALF_CYCLE * 8  // us
 
 int controller_init(void) {
+#ifdef IS_PI
   if (gpioInitialise() < 0) {
     return EXIT_FAILURE;
   }
@@ -22,20 +26,28 @@ int controller_init(void) {
   gpioSetMode(18, PI_OUTPUT);
   // Pin 27: pulse
   gpioSetMode(27, PI_OUTPUT);
+#endif
 
   return EXIT_SUCCESS;
 }
 
-void deinit_controller(void) { gpioTerminate(); }
+void deinit_controller(void) {
+#ifdef IS_PI
+  gpioTerminate();
+#endif
+}
 
 void controller_pulse(void) {
+#ifdef IS_PI
   gpioWrite(27, 1);
   gpioDelay(PULSE_HALF_CYCLE);
   gpioWrite(27, 0);
+#endif
 }
 
 void controller_poll(controller_state* cntrl1_state,
                      controller_state* cntrl2_state) {
+#ifdef IS_PI
   // Set latch for 12us
   gpioWrite(18, 1);
   gpioDelay(LATCH_DURATION);
@@ -87,4 +99,13 @@ void controller_poll(controller_state* cntrl1_state,
   cntrl_1_state->right = !gpioRead(17);
   cntrl_2_state->right = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
+#endif
+}
+
+inline bool has_controller_available(void) {
+#ifdef IS_PI
+  return true;
+#else
+  return false;
+#endif
 }
