@@ -56,7 +56,6 @@ bool cpu_cycle(cpu* cpu) {
   }
 
   if (cpu->nmi_pending) {
-    printf("nmi\n");
     cpu->nmi_pending = false;
     cpu_interrupt(cpu, INTRT_NMI);
   }
@@ -66,12 +65,12 @@ bool cpu_cycle(cpu* cpu) {
     case INTRT_IRQ:
       perform_irq(cpu);
       cpu->last_interrupt = INTRT_NONE;
-      cpu->busy = 7;
+      cpu->busy = 7 * 3;
       return false;
     case INTRT_NMI:
       perform_nmi(cpu);
       cpu->last_interrupt = INTRT_NONE;
-      cpu->busy = 7;
+      cpu->busy = 7 * 3;
       return false;
     default:
       break;
@@ -194,14 +193,19 @@ bool cpu_cycle(cpu* cpu) {
     return true;
   }
 
-  cpu->busy += instr.cycles + (instr.cycle_cross && page_crossed ? 1 : 0) +
-               (instr.cycle_branch && cpu->branch_taken ? 1 : 0);
+  cpu->busy += instr.cycles * 3;
+  if (instr.cycle_cross && page_crossed) {
+    cpu->busy += 3;
+  }
+  if (instr.cycle_branch && cpu->branch_taken) {
+    cpu->busy += 3;
+  }
   return false;
 }
 
 /* Utilities */
 uint8_t cpu_mem_read8(cpu* cpu, uint16_t address) {
-  return mmap_cpu_read(cpu->mapper, address);
+  return mmap_cpu_read(cpu->mapper, address, false);
   //return cpu->memory[address];
 }
 
