@@ -1,6 +1,8 @@
-#include "apu.h"
 #include <math.h>
 #include <stdio.h>
+
+#include "apu.h"
+#include "cpu.h"
 
 #define START_CHANNELS 0x4000
 #define END_CHANNELS 0x4013
@@ -46,28 +48,73 @@ const uint16_t APU_NOISE_TABLE[] = {4,   8,   16,  32,  64,  96,   128,  160,
 
 apu* apu_init(void) { return calloc(1, sizeof(apu)); }
 
-uint8_t apu_pulse0_output(apu* apu) { return -1; }
+uint8_t apu_clock_envelope(const apu_dve* dve, apu_envelope* envelope) {
+  if (!envelope->start_flag) {
+    if (envelope->divider == 0) {
+      envelope->divider = dve->data.divider_period;
+      if (envelope->decay_level_counter != 0) {
+        envelope->decay_level_counter--;
+      } else if (dve->data.length_counter_halt) {
+        envelope->decay_level_counter = 15;
+      }
+    } else {
+      envelope->divider--;
+    }
+  } else {
+    envelope->start_flag = false;
+    envelope->decay_level_counter = 15;
+    envelope->divider = dve->data.divider_period;
+  }
 
-uint8_t apu_pulse1_output(apu* apu) { return -1; }
-
-uint8_t apu_pulses_output(apu* apu) {
-  // These formulae are linear approximations
-  uint8_t pulse0 = apu_pulse0_output(apu);
-  uint8_t pulse1 = apu_pulse1_output(apu);
-  return 0.00752 * (pulse0 + pulse1);
+  if (dve->data.constant_volume_envelope) {
+    return 15;
+  } else {
+    return envelope->decay_level_counter;
+  }
 }
 
-uint8_t apu_triangle_output(apu* apu) { return -1; }
+void apu_pulse1_calculate(apu* apu) {
+  // Components of the pulse channel
+  // Envelope
+  // Sweep
+  // Length counter
+  //
+  // The envelope is the way that a sound's parameter changes over time. The NES
+  // emvelope generates a decreasing saw envelope with optional looping, or a
+  // constant volume.
 
-uint8_t apu_noise_output(apu* apu) { return -1; }
+  apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1)};
+  apu_lclt par_b = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG4)};
 
-uint8_t apu_dmc_output(apu* apuc) { return -1; }
+  uint8_t volume = apu_clock_envelope(&par_a, &apu->pulse1_envelope);
+}
+
+void apu_pulse2_calculate(apu* apu) {
+  apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG1)};
+  apu_lclt par_b = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG4)};
+
+  uint8_t volume = apu_clock_envelope(&par_a, &apu->pulse2_envelope);
+}
+
+void apu_triangle_calculate(apu* apu) {}
+
+void apu_noise_calculate(apu* apu) {
+  apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG1)};
+  apu_lclt par_b = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG3)};
+
+  uint8_t volume = apu_clock_envelope(&par_a, &apu->noise_envelope);
+}
+
+void apu_dmc_calculate(apu* apuc) {}
+
+uint8_t apu_pulses_output(apu* apu) {
+  // This formula is a linear approximation
+  return 0.00752 * (apu->last_pulse1 + apu->last_pulse2);
+}
 
 uint8_t apu_tnd_output(apu* apu) {
-  uint8_t triangle = apu_triangle_output(apu);
-  uint8_t noise = apu_noise_output(apu);
-  uint8_t dmc = apu_dmc_output(apu);
-  return 0.00851 * triangle + 0.00494 * noise + 0.00335 * dmc;
+  return 0.00851 * apu->last_triangle + 0.00494 * apu->last_noise +
+         0.00335 * apu->last_dmc;
 }
 
 void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {}
@@ -76,6 +123,61 @@ void apu_write_to_buffer(apu* apu, uint8_t value) {
   apu->buffer[apu->buffer_cursor] = value;
   apu->buffer_cursor++;
   apu->buffer_cursor = apu->buffer_cursor % AUDIO_BUFFER_SIZE;
+}
+
+void apu_sequencer_cycle(apu* apu) {
+  // Get the current mode
+  register_4017_frame_counter fc = {
+      .raw = mmap_cpu_read(apu->mapper, FRAME_COUNTER)};
+  register_4015_status status = {.raw = mmap_cpu_read(apu->mapper, STATUS)};
+  if (fc.data.mode == 0) {
+    // Counter mode 0
+    if (apu->sequencer_elapsed_apu_cycles >= 14915) {
+      apu_pulse1_calculate(apu);
+      apu_pulse2_calculate(apu);
+      apu->sequencer_elapsed_apu_cycles = 0;
+    } else if (apu->sequencer_elapsed_apu_cycles >= 14914) {
+      if (!fc.data.irq_inhibit) {
+        // Set status frame interrupt flag to 1 & issue IRQ
+        status.data.frame_interrupt = 1;
+        mmap_cpu_write(apu->mapper, STATUS, status.raw);
+        cpu_interrupt(apu->mapper->cpu, INTRT_IRQ);
+      } else if (status.data.frame_interrupt) {
+        // Setting the inhibit flag will unset the interrupt flag
+        // TODO: So does reading $4015
+        status.data.frame_interrupt = 0;
+        mmap_cpu_write(apu->mapper, STATUS, status.raw);
+      }
+    } else if (apu->sequencer_elapsed_apu_cycles >= 11186) {
+      apu_pulse1_calculate(apu);
+      apu_pulse2_calculate(apu);
+    } else if (apu->sequencer_elapsed_apu_cycles >= 7457) {
+      apu_pulse1_calculate(apu);
+      apu_pulse2_calculate(apu);
+    } else if (apu->sequencer_elapsed_apu_cycles >= 3729) {
+      apu_pulse1_calculate(apu);
+      apu_pulse2_calculate(apu);
+    }
+  } else if (fc.data.mode == 1) {
+    // Counter mode 1
+    if (apu->sequencer_elapsed_apu_cycles >= 18641) {
+      apu_pulse1_calculate(apu);
+      apu_pulse2_calculate(apu);
+      apu->sequencer_elapsed_apu_cycles = 0;
+    } else if (apu->sequencer_elapsed_apu_cycles >= 14915) {
+    } else if (apu->sequencer_elapsed_apu_cycles >= 11186) {
+      apu_pulse1_calculate(apu);
+      apu_pulse2_calculate(apu);
+    } else if (apu->sequencer_elapsed_apu_cycles >= 7457) {
+      apu_pulse1_calculate(apu);
+      apu_pulse2_calculate(apu);
+    } else if (apu->sequencer_elapsed_apu_cycles >= 3729) {
+      apu_pulse1_calculate(apu);
+      apu_pulse2_calculate(apu);
+    }
+  }
+
+  apu->sequencer_elapsed_apu_cycles += 2;
 }
 
 void apu_cycle(apu* apu, void* context,
@@ -90,6 +192,13 @@ void apu_cycle(apu* apu, void* context,
 
   apu->cycle_count = 2;
 
+  // Frame counter
+  if (apu->is_even_cycle) {
+    apu_sequencer_cycle(apu);
+  }
+  apu->is_even_cycle = !apu->is_even_cycle;
+
+  // Create output
   uint8_t val = apu_pulses_output(apu) + apu_tnd_output(apu);
 
   // Skip samples/ downsample

@@ -24,10 +24,22 @@ typedef union {
     uint8_t divider_period : 4;
     uint8_t constant_volume_envelope : 1;
     uint8_t length_counter_halt : 1;
+    uint8_t : 2;
+  } data;  // Common data
+  struct {
+    uint8_t divider_period : 4;
+    uint8_t constant_volume_envelope : 1;
+    uint8_t length_counter_halt : 1;
     uint8_t duty_cycle : 2;
-  } data;
+  } data_period;
+  struct {
+    uint8_t divider_period : 4;
+    uint8_t constant_volume_envelope : 1;
+    uint8_t length_counter_halt : 1;
+    uint8_t : 2;
+  } data_noise;
   uint8_t raw;
-} register_4000_4004;
+} apu_dve;
 
 typedef union {
   struct {
@@ -48,11 +60,19 @@ typedef union {
 
 typedef union {
   struct {
-    uint8_t timer_high : 3;
+    uint8_t : 3;
     uint8_t length_counter_load : 5;
   } data;
+  struct {
+    uint8_t timer_high : 3;
+    uint8_t length_counter_load : 5;
+  } data_period;
+  struct {
+    uint8_t : 3;
+    uint8_t length_counter_load : 5;
+  } data_noise;
   uint8_t raw;
-} register_4003_4007;
+} apu_lclt;
 
 typedef union {
   struct {
@@ -79,10 +99,6 @@ typedef union {
 
 typedef union {
   struct {
-    uint8_t divider_period : 4;
-    uint8_t constant_volume_envelope : 1;
-    uint8_t length_counter_halt : 1;
-    uint8_t : 2;
   } data;
   uint8_t raw;
 } register_400c;
@@ -95,14 +111,6 @@ typedef union {
   } data;
   uint8_t raw;
 } register_400e;
-
-typedef union {
-  struct {
-    uint8_t : 3;
-    uint8_t length_counter_load : 5;
-  } data;
-  uint8_t raw;
-} register_400f;
 
 typedef union {
   struct {
@@ -138,8 +146,8 @@ typedef union {
 
 typedef union {
   struct {
-    uint8_t enable_pulse0 : 1;
     uint8_t enable_pulse1 : 1;
+    uint8_t enable_pulse2 : 1;
     uint8_t enable_triangle : 1;
     uint8_t enable_noise : 1;
     uint8_t enable_dmc : 1;
@@ -160,15 +168,32 @@ typedef union {
 } register_4017_frame_counter;
 
 typedef struct {
+  bool start_flag;
+  uint8_t divider;
+  uint8_t decay_level_counter;
+} apu_envelope;
+
+typedef struct {
   mapper* mapper;
 
   bool linear_counter_reload;
+
+  // Sequencer
+  uint32_t sequencer_elapsed_apu_cycles;
+
+  // Envelopes
+  apu_envelope pulse1_envelope;
+  apu_envelope pulse2_envelope;
+  apu_envelope noise_envelope;
+
+  // Outputting sound
   uint8_t cycle_count;
   double sample_skips;
   uint8_t buffer[AUDIO_BUFFER_SIZE];
   int buffer_cursor;
+  bool is_even_cycle;
 
-  double cntr;
+  uint8_t last_pulse1, last_pulse2, last_triangle, last_noise, last_dmc;
 } apu;
 
 /**
