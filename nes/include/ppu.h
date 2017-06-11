@@ -26,14 +26,14 @@
 #define PPU_SL_PRERENDER 261
 
 // CPU mapped addresses
-#define PPU_ADDR_CTRL 0x2000
-#define PPU_ADDR_MASK 0x2001
-#define PPU_ADDR_STATUS 0x2002
-#define PPU_ADDR_OAMADDR 0x2003
-#define PPU_ADDR_OAMDATA 0x2004
-#define PPU_ADDR_PPUSCROLL 0x2005
-#define PPU_ADDR_PPUADDR 0x2006
-#define PPU_ADDR_PPUDATA 0x2007
+#define PPU_ADDR_CTRL 0x0
+#define PPU_ADDR_MASK 0x1
+#define PPU_ADDR_STATUS 0x2
+#define PPU_ADDR_OAMADDR 0x3
+#define PPU_ADDR_OAMDATA 0x4
+#define PPU_ADDR_PPUSCROLL 0x5
+#define PPU_ADDR_PPUADDR 0x6
+#define PPU_ADDR_PPUDATA 0x7
 #define PPU_ADDR_OAMDMA 0x4014
 
 /**
@@ -41,14 +41,20 @@
  * actually accessed via the CPU mapped addresses 0x2005 and 0x2006.
  */
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t x_coarse : 5;
     uint8_t y_coarse : 5;
     uint8_t nx : 1;
     uint8_t ny : 1;
     uint8_t y_fine : 3;
+    uint8_t : 1;
   } scroll;
-  struct {
+  struct __attribute__((packed)) {
+    uint16_t : 10;
+    uint16_t nt : 2;
+    uint16_t : 4;
+  } nt_select;
+  struct __attribute__((packed)) {
     uint16_t addr : 12;
     uint16_t : 4;
   } nametable;
@@ -67,7 +73,7 @@ typedef enum {
  * Structs for the OAM.
  */
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t bank : 1;
     uint8_t tile : 7;
   } index;
@@ -75,7 +81,7 @@ typedef union {
 } oam_index;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t palette : 2;
     uint8_t : 3;
     uint8_t priority : 1;
@@ -85,12 +91,24 @@ typedef union {
   uint8_t raw;
 } oam_attr;
 
+typedef struct __attribute__((packed)) {
+  uint8_t y : 8;
+  uint8_t index : 8;
+  uint8_t attr : 8;
+  uint8_t x : 8;
+} oam_sprite;
+
+typedef struct __attribute__((packed)) {
+  uint8_t oam_index;
+  uint16_t pattern;
+} oam_state;
+
 /**
  * The main PPU struct. Holds internal state, memory, and registers.
  */
 typedef struct {
   union {
-    struct {
+    struct __attribute__((packed)) {
       uint8_t nametable : 2;
       uint8_t increment : 1;
       uint8_t sprite_table : 1;
@@ -102,7 +120,7 @@ typedef struct {
     uint8_t raw;
   } ctrl;
   union {
-    struct {
+    struct __attribute__((packed)) {
       uint8_t gray : 1;
       uint8_t show_left_bg : 1;
       uint8_t show_left_sprites : 1;
@@ -110,13 +128,13 @@ typedef struct {
       uint8_t show_sprites : 1;
       uint8_t : 3;
     } flags;
-    struct {
+    struct __attribute__((packed)) {
       uint8_t : 5;
       uint8_t emph_r : 1;
       uint8_t emph_g : 1;
       uint8_t emph_b : 1;
     } emph_ntsc;
-    struct {
+    struct __attribute__((packed)) {
       uint8_t : 5;
       uint8_t emph_g : 1;
       uint8_t emph_r : 1;
@@ -125,7 +143,7 @@ typedef struct {
     uint8_t raw;
   } mask;
   union {
-    struct {
+    struct __attribute__((packed)) {
       uint8_t last_write : 5;
       uint8_t overflow : 1;
       uint8_t sprite0_hit : 1;
@@ -143,11 +161,12 @@ typedef struct {
   uint16_t scanline;
   bool frame_odd;
 
-  uint32_t ignore_writes;
+  // Special R/W conditions
+  bool oam_data_ff;
 
   // Internal registers
-  scroll_reg v;
-  scroll_reg t;
+  scroll_reg v; // Current VRAM address
+  scroll_reg t; // Temporary VRAM address
   uint8_t x;
   bool w;
   bool nmi_occurred;
@@ -155,28 +174,36 @@ typedef struct {
   bool nmi;
 
   // Palette
-  uint32_t palette[32];
+  uint8_t palette[32];
 
-  // Background rendering
-  uint32_t pat_addr;
+  // Rendering
   uint16_t io_addr;
-  uint16_t tile_pat;
-  uint16_t tile_attr;
-  uint32_t bg_pat;
-  uint32_t bg_attr;
+
+  // Background
+  uint8_t ren_nt;
+  uint8_t ren_at;
+  uint8_t ren_bg_low;
+  uint8_t ren_bg_high;
+  uint64_t tile_data;
 
   // Sprite rendering
-  uint8_t oam_address;
-  uint8_t oam[256];
   union {
-    struct {
-      uint8_t y : 8;
-      uint8_t index : 8;
-      uint8_t attr : 8;
-      uint8_t x : 8;
-    } sprites[8];
+    oam_sprite sprites[64];
+    uint32_t raw32[64];
+    uint8_t raw[256];
+  } oam;
+  union {
+    oam_sprite sprites[8];
+    uint32_t raw32[8];
     uint8_t raw[32];
-  } oam_secondary;
+  } oam_secondary, oam_tertiary;
+  oam_state oam_secondary_state[8];
+  oam_state oam_tertiary_state[8];
+  uint8_t oam_address;
+  uint8_t oam_spr_n;
+  uint8_t oam_spr_count;
+  uint8_t spr_ren_pos;
+  uint8_t spr_ren_count;
 
   // Visual output
   ppu_driver driver;
@@ -184,15 +211,33 @@ typedef struct {
   uint8_t screen[PPU_SCREEN_SIZE];
 } ppu;
 
+/**
+ * Memory access from the mapper to the PPU.
+ */
 void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value);
-uint8_t ppu_mem_read(ppu* ppu, uint16_t address);
-uint8_t ppu_mem_read_dummy(ppu* ppu, uint16_t address);
+uint8_t ppu_mem_read(ppu* ppu, uint16_t address, bool dummy);
 
-void ppu_reset(ppu* ppu);
-void ppu_power(ppu* ppu);
-
+/**
+ * Initialises and returns a PPU. This implicitly "powers on" the PPU.
+ */
 ppu* ppu_init(void);
 
+/**
+ * Resets the PPU, equivalent to pressing the reset button on a NES.
+ */
+void ppu_reset(ppu* ppu);
+
+/**
+ * Powers on the PPU, equivalent to powering on the NES.
+ */
+void ppu_power(ppu* ppu);
+
+/**
+ * Executes a single PPU cycle.
+ */
 void ppu_cycle(ppu* ppu);
 
+/**
+ * Frees any dynamic memory allocated for the PPU.
+ */
 void ppu_deinit(ppu* ppu);
