@@ -78,15 +78,15 @@ static void apu_clock_specific_envelope(const apu_dve dve,
 static void apu_clock_envelope(apu* apu) {
   // Update envelopes
   {
-    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1)};
+    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1, false)};
     apu_clock_specific_envelope(dve, &apu->pulse1_envelope);
   }
   {
-    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG1)};
+    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG1, false)};
     apu_clock_specific_envelope(dve, &apu->pulse2_envelope);
   }
   {
-    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG1)};
+    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG1, false)};
     apu_clock_specific_envelope(dve, &apu->noise_envelope);
   }
 }
@@ -99,8 +99,8 @@ static void apu_clock_specific_sweep(apu* apu, const register_4001_4005 flags,
     return;  // ??
   }
 
-  register_4002_4006 par_b = {.raw = mmap_cpu_read(apu->mapper, reg3)};
-  apu_lclt par_c = {.raw = mmap_cpu_read(apu->mapper, reg4)};
+  register_4002_4006 par_b = {.raw = mmap_cpu_read(apu->mapper, reg3, false)};
+  apu_lclt par_c = {.raw = mmap_cpu_read(apu->mapper, reg4, false)};
   uint16_t raw_period = (((uint16_t)par_c.data_period.timer_high) << 8) |
                         (uint16_t)par_b.data.timer_low;
 
@@ -134,10 +134,10 @@ static void apu_clock_specific_sweep(apu* apu, const register_4001_4005 flags,
 
 /* ----- PULSE CALCULATION ----- */
 static void apu_pulse1_calculate(apu* apu) {
-  // apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1)};
+  // apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1, false)};
   // register_4002_4006 par_b = {.raw = mmap_cpu_read(apu->mapper,
-  // PULSE1_REG3)}; apu_lclt par_c = {.raw = mmap_cpu_read(apu->mapper,
-  // PULSE1_REG4)};
+  // PULSE1_REG3, false)}; apu_lclt par_c = {.raw = mmap_cpu_read(apu->mapper,
+  // PULSE1_REG4, false)};
 
   //   uint16_t raw_period = (((uint16_t)par_c.data_period.timer_high) << 8) |
   //                         (uint16_t)par_b.data.timer_low;
@@ -182,18 +182,19 @@ static void apu_write_to_buffer(apu* apu, uint8_t value) {
 static void apu_sequencer_cycle(apu* apu) {
   // Frame counter (drives envelope)
   register_4017_frame_counter fc = {
-      .raw = mmap_cpu_read(apu->mapper, FRAME_COUNTER)};
-  register_4015_status status = {.raw = mmap_cpu_read(apu->mapper, STATUS)};
+      .raw = mmap_cpu_read(apu->mapper, FRAME_COUNTER, false)};
+  register_4015_status status = {.raw =
+                                     mmap_cpu_read(apu->mapper, STATUS, false)};
   if (fc.data.mode == 0) {
     // Counter mode 0
     if (apu->sequencer_elapsed_apu_cycles >= 14915) {
       apu_clock_envelope(apu);
       register_4001_4005 flags_pulse1 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2)};
+          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
                                PULSE1_REG3, PULSE1_REG4);
       register_4001_4005 flags_pulse2 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2)};
+          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
                                PULSE2_REG3, PULSE2_REG4);
       apu->sequencer_elapsed_apu_cycles = 0;
@@ -214,11 +215,11 @@ static void apu_sequencer_cycle(apu* apu) {
     } else if (apu->sequencer_elapsed_apu_cycles >= 7457) {
       apu_clock_envelope(apu);
       register_4001_4005 flags_pulse1 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2)};
+          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
                                PULSE1_REG3, PULSE1_REG4);
       register_4001_4005 flags_pulse2 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2)};
+          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
                                PULSE2_REG3, PULSE2_REG4);
     } else if (apu->sequencer_elapsed_apu_cycles >= 3729) {
@@ -229,11 +230,11 @@ static void apu_sequencer_cycle(apu* apu) {
     if (apu->sequencer_elapsed_apu_cycles >= 18641) {
       apu_clock_envelope(apu);
       register_4001_4005 flags_pulse1 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2)};
+          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
                                PULSE1_REG3, PULSE1_REG4);
       register_4001_4005 flags_pulse2 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2)};
+          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
                                PULSE2_REG3, PULSE2_REG4);
       apu->sequencer_elapsed_apu_cycles = 0;
@@ -243,11 +244,11 @@ static void apu_sequencer_cycle(apu* apu) {
     } else if (apu->sequencer_elapsed_apu_cycles >= 7457) {
       apu_clock_envelope(apu);
       register_4001_4005 flags_pulse1 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2)};
+          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
                                PULSE1_REG3, PULSE1_REG4);
       register_4001_4005 flags_pulse2 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2)};
+          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
                                PULSE2_REG3, PULSE2_REG4);
     } else if (apu->sequencer_elapsed_apu_cycles >= 3729) {

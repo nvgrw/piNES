@@ -207,7 +207,7 @@ bool rom_has_bus_conflicts(mapper* mapper);
  * Read / write from within the CPU
  */
 void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val);
-uint8_t mmap_cpu_read(mapper* mapper, uint16_t address);
+uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy);
 void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf);
 
 /**

@@ -14,7 +14,7 @@ NFD_LDFLAGS = -L/DevProjects/Libs/tpl/nativefiledialog/build/lib/Release/x64 -ln
 
 # compiler configuration, may be overwritten with environment variables
 CC ?= gcc
-CFLAGS ?= -I$(SPC_INCLUDE_DIR) -Wall -g -D_POSIX_SOURCE -D_BSD_SOURCE -std=c99 -Werror -pedantic
+CFLAGS ?= -I$(SPC_INCLUDE_DIR) -Wall -O3 -D_POSIX_SOURCE -D_BSD_SOURCE -std=c99 -Werror -pedantic
 MOD_CFLAGS = $(CFLAGS) $(SDL_CFLAGS) $(SDL_IMAGE_CFLAGS) $(NFD_CFLAGS) -D_THREAD_SAFE
 MOD_LDFLAGS = $(SDL_LDFLAGS) $(SDL_IMAGE_LDFLAGS) $(NFD_LDFLAGS) -framework AppKit -framework OpenGL -framework Cocoa
 

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "apu.h"
+#include "cpu.h"
 #include "mappers.h"
 #include "ppu.h"
 
@@ -269,74 +270,6 @@ bool rom_has_bus_conflicts(mapper* mapper) {
   return false;
 }
 
-/*
-void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
-  if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
-    ppu_mem_write((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) %
-MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE, val); return;
-  }
-}
-uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
-  if (address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) {
-    return ppu_mem_read_dummy((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) %
-MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE);
-  }
-  return 0;
-}
-*/
-void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
-  if (address >= 0x3000 && address < 0x3F00) {
-    address -= 0x1000;
-  }
-  if (address < 0x2000) {
-    mapper->mapped.ppu_pattable0[address - MC_PATTABLE0_BASE] = val;
-    return;
-  }
-  if (address >= 0x3F00) {
-    ((ppu*)mapper->ppu)->palette[address & 0x1F] = val;
-    return;
-  }
-  // Nametable
-  mirror_type mt = rom_get_mirror_type(mapper);
-  uint8_t* nametable = mapper->mapped.ppu_nametable0;
-  if (address >= MC_NAMETABLE1_BASE && address < MC_NAMETABLE1_UPPER &&
-      mt == MIRRORTYPE_VERTICAL) {
-    nametable = mapper->mapped.ppu_nametable1;
-  } else if (address >= MC_NAMETABLE2_BASE && address < MC_NAMETABLE2_UPPER &&
-             mt == MIRRORTYPE_HORIZONTAL) {
-    nametable = mapper->mapped.ppu_nametable1;
-  } else if (address >= MC_NAMETABLE3_BASE && address < MC_NAMETABLE3_UPPER &&
-             mt == MIRRORTYPE_VERTICAL) {
-    nametable = mapper->mapped.ppu_nametable1;
-  }
-  nametable[address & 0x3FF] = val;
-}
-uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
-  if (address >= 0x3000 && address < 0x3F00) {
-    address -= 0x1000;
-  }
-  if (address < 0x2000) {
-    return mapper->mapped.ppu_pattable0[address - MC_PATTABLE0_BASE];
-  }
-  if (address >= 0x3F00) {
-    return ((ppu*)mapper->ppu)->palette[address & 0x1F];
-  }
-  // Nametable
-  mirror_type mt = rom_get_mirror_type(mapper);
-  uint8_t* nametable = mapper->mapped.ppu_nametable0;
-  if (address >= MC_NAMETABLE1_BASE && address < MC_NAMETABLE1_UPPER &&
-      mt == MIRRORTYPE_VERTICAL) {
-    nametable = mapper->mapped.ppu_nametable1;
-  } else if (address >= MC_NAMETABLE2_BASE && address < MC_NAMETABLE2_UPPER &&
-             mt == MIRRORTYPE_HORIZONTAL) {
-    nametable = mapper->mapped.ppu_nametable1;
-  } else if (address >= MC_NAMETABLE3_BASE && address < MC_NAMETABLE3_UPPER &&
-             mt == MIRRORTYPE_VERTICAL) {
-    nametable = mapper->mapped.ppu_nametable1;
-  }
-  return nametable[address & 0x3FF];
-}
-
 // Memory access functions
 void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
@@ -345,10 +278,7 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   }
   if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
       address == 0x4014) {
-    ppu_mem_write(
-        (ppu*)mapper->ppu,
-        ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE,
-        val);
+    ppu_mem_write((ppu*)mapper->ppu, address, val);
     return;
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
@@ -356,6 +286,9 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
     // mapped.registers[address - MC_REGISTERS_BASE] = val;
     apu_mem_write(mapper->apu, address, val);
   }
+
+  mapper->mapped.prg_rom1[address % 0x4000] = val;
+  return;
 
   if (address >= MC_SRAM_BASE && address < MC_SRAM_UPPER) {
     mapper->mapped.sram[address - MC_SRAM_BASE] = val;
@@ -365,21 +298,19 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   MAPPERS[rom_get_mapper_number(mapper)].cpu_write(mapper, address, val);
 }
 
-uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
+uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
     return mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE];
   }
   if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
       address == 0x4014) {
-    return ppu_mem_read_dummy(
-        (ppu*)mapper->ppu,
-        ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE);
+    return ppu_mem_read((ppu*)mapper->ppu, address, dummy);
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
     return 0;  // mapper->mapped.registers[address - MC_REGISTERS_BASE];
   }
   return mapper->mapped.prg_rom1[address % 0x4000];
-  /*
+
   if (address >= MC_CART_EXPANSION_ROM_BASE &&
       address < MC_CART_EXPANSION_ROM_UPPER) {
     return 0;
@@ -399,18 +330,17 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address) {
   }
 
   return MAPPERS[rom_get_mapper_number(mapper)].cpu_read(mapper, address);
-  */
 }
 
 void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf) {
   uint16_t cur = address * 0x100;
+  ((cpu*)mapper->cpu)->busy += 513 * 3;
   for (uint16_t i = 0; i < 256; i++) {
-    buf[i] = mmap_cpu_read(mapper, cur);
+    buf[i] = mmap_cpu_read(mapper, cur, false);
     cur++;
   }
 }
 
-/*
 void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
   if (address >= 0x3000 && address < 0x3000 + 0xF00) {
     address -= 0x1000;
@@ -428,29 +358,20 @@ void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
     mapper->mapped.ppu_nametable0[address - MC_NAMETABLE0_BASE] = val;
     return;
   }
-  mirror_type mt = rom_get_mirror_type(mapper);
-  if (address >= MC_NAMETABLE1_BASE && address < MC_NAMETABLE1_UPPER) {
-    if (mt == MIRRORTYPE_VERTICAL) {
-      mapper->mapped.ppu_nametable1[address - MC_NAMETABLE1_BASE] = val;
-    } else if (mt == MIRRORTYPE_HORIZONTAL) {
-      mapper->mapped.ppu_nametable0[address - MC_NAMETABLE1_BASE] = val;
+
+  // Nametable
+  if (address >= MC_NAMETABLE0_BASE && address < MC_NAMETABLE3_UPPER) {
+    mirror_type mt = rom_get_mirror_type(mapper);
+    uint8_t* nametable = mapper->mapped.ppu_nametable0;
+    if (address < MC_NAMETABLE1_UPPER && mt == MIRRORTYPE_VERTICAL) {
+      nametable = mapper->mapped.ppu_nametable1;
+    } else if (address >= MC_NAMETABLE2_BASE && address < MC_NAMETABLE2_UPPER &&
+               mt == MIRRORTYPE_HORIZONTAL) {
+      nametable = mapper->mapped.ppu_nametable1;
+    } else if (address >= MC_NAMETABLE3_BASE && mt == MIRRORTYPE_VERTICAL) {
+      nametable = mapper->mapped.ppu_nametable1;
     }
-    return;
-  }
-  if (address >= MC_NAMETABLE2_BASE && address < MC_NAMETABLE2_UPPER) {
-    if (mt == MIRRORTYPE_VERTICAL) {
-      mapper->mapped.ppu_nametable0[address - MC_NAMETABLE2_BASE] = val;
-    } else if (mt == MIRRORTYPE_HORIZONTAL) {
-      mapper->mapped.ppu_nametable1[address - MC_NAMETABLE2_BASE] = val;
-    }
-    return;
-  }
-  if (address >= MC_NAMETABLE3_BASE && address < MC_NAMETABLE3_UPPER) {
-    if (mt == MIRRORTYPE_VERTICAL) {
-      mapper->mapped.ppu_nametable1[address - MC_NAMETABLE2_BASE] = val;
-    } else if (mt == MIRRORTYPE_HORIZONTAL) {
-      mapper->mapped.ppu_nametable0[address - MC_NAMETABLE2_BASE] = val;
-    }
+    nametable[address & 0x3FF] = val;
     return;
   }
 
@@ -471,30 +392,21 @@ uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
   if (address >= MC_NAMETABLE0_BASE && address < MC_NAMETABLE0_UPPER) {
     return mapper->mapped.ppu_nametable0[address - MC_NAMETABLE0_BASE];
   }
-  mirror_type mt = rom_get_mirror_type(mapper);
-  if (address >= MC_NAMETABLE1_BASE && address < MC_NAMETABLE1_UPPER) {
-    if (mt == MIRRORTYPE_VERTICAL) {
-      return mapper->mapped.ppu_nametable1[address - MC_NAMETABLE1_BASE];
-    } else if (mt == MIRRORTYPE_HORIZONTAL) {
-      return mapper->mapped.ppu_nametable0[address - MC_NAMETABLE1_BASE];
+
+  // Nametable
+  if (address >= MC_NAMETABLE0_BASE && address < MC_NAMETABLE3_UPPER) {
+    mirror_type mt = rom_get_mirror_type(mapper);
+    uint8_t* nametable = mapper->mapped.ppu_nametable0;
+    if (address < MC_NAMETABLE1_UPPER && mt == MIRRORTYPE_VERTICAL) {
+      nametable = mapper->mapped.ppu_nametable1;
+    } else if (address >= MC_NAMETABLE2_BASE && address < MC_NAMETABLE2_UPPER &&
+               mt == MIRRORTYPE_HORIZONTAL) {
+      nametable = mapper->mapped.ppu_nametable1;
+    } else if (address >= MC_NAMETABLE3_BASE && mt == MIRRORTYPE_VERTICAL) {
+      nametable = mapper->mapped.ppu_nametable1;
     }
-  }
-  if (address >= MC_NAMETABLE2_BASE && address < MC_NAMETABLE2_UPPER) {
-    if (mt == MIRRORTYPE_VERTICAL) {
-      return mapper->mapped.ppu_nametable0[address - MC_NAMETABLE2_BASE];
-    } else if (mt == MIRRORTYPE_HORIZONTAL) {
-      return mapper->mapped.ppu_nametable1[address - MC_NAMETABLE2_BASE];
-    }
-  }
-  if (address >= MC_NAMETABLE3_BASE && address < MC_NAMETABLE3_UPPER) {
-    if (mt == MIRRORTYPE_VERTICAL) {
-      return mapper->mapped.ppu_nametable1[address - MC_NAMETABLE2_BASE];
-    } else if (mt == MIRRORTYPE_HORIZONTAL) {
-      return mapper->mapped.ppu_nametable0[address - MC_NAMETABLE2_BASE];
-    }
+    return nametable[address & 0x3FF];
   }
 
   return MAPPERS[rom_get_mapper_number(mapper)].ppu_read(mapper, address);
 }
-
-*/

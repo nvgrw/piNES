@@ -103,6 +103,7 @@ void sys_step(sys* sys) {
 }
 
 void sys_test(sys* sys) {
+  // TODO: make this work again
   FILE* fp = fopen("tests/6502_functional_test.bin", "r");
   fseek(fp, 0, SEEK_END);
   size_t size = ftell(fp);

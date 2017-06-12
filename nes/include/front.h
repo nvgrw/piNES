@@ -24,7 +24,8 @@ typedef enum {
   FT_PPU,
   FT_APU,
   FT_IO,
-  FT_MMC
+  FT_MMC_CPU,
+  FT_MMC_PPU
 } front_tab;
 
 /**

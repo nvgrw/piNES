@@ -13,8 +13,6 @@
 #include "region.h"
 #include "sys.h"
 
-#define dbg(X) printf(X "\n");
-
 #define BUTTON_LOAD 0
 #define BUTTON_START 1
 #define BUTTON_STOP 2
@@ -24,10 +22,11 @@
 #define BUTTON_PPU 6
 #define BUTTON_APU 7
 #define BUTTON_IO 8
-#define BUTTON_MMC 9
-#define BUTTON_TEST 10
+#define BUTTON_MMC_CPU 9
+#define BUTTON_MMC_PPU 10
+#define BUTTON_TEST 11
 
-#define BUTTON_NUM 11
+#define BUTTON_NUM 12
 
 /**
  * front_sdl.c
@@ -95,13 +94,12 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
               case BUTTON_PPU:
               case BUTTON_APU:
               case BUTTON_IO:
-              case BUTTON_MMC:
+              case BUTTON_MMC_CPU:
+              case BUTTON_MMC_PPU:
                 if (impl->front->tab == but_sel - BUTTON_CPU + FT_CPU) {
                   impl->front->tab = FT_SCREEN;
-                  SDL_SetWindowSize(impl->window, 256, 240);
                 } else {
                   impl->front->tab = but_sel - BUTTON_CPU + FT_CPU;
-                  SDL_SetWindowSize(impl->window, 256, 256);
                 }
                 break;
               case BUTTON_TEST:
@@ -115,7 +113,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
     uint32_t this_tick = SDL_GetTicks();
     sys_run(sys, this_tick - last_tick, impl, front_sdl_impl_audio_enqueue);
     last_tick = this_tick;
-    if (sys->running && impl->front->tab == FT_SCREEN) {
+    if (sys->running &&
+        (impl->front->tab == FT_SCREEN || impl->front->tab == FT_PPU)) {
       // If the system is running, flip on demand
       if (sys->ppu->flip) {
         void* pixels;
@@ -127,18 +126,32 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
             impl->screen_pix[i] = impl->palette[sys->ppu->screen[i]];
           }
           memcpy(pixels, impl->screen_pix, PPU_SCREEN_SIZE_BYTES);
+          memset((uint8_t*)pixels + 240 * pitch, 0, 16 * pitch);
           SDL_UnlockTexture(impl->screen_tex);
           SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, NULL);
           front_sdl_impl_flip(impl);
         }
         sys->ppu->flip = false;
       }
-      SDL_Delay(10);
+      SDL_Delay(2);
     } else {
-      // Otherwise flip on every frame
+      // Otherwise flip on every 100ms
       front_sdl_impl_flip(impl);
       SDL_Delay(100);
     }
+  }
+}
+
+static void display_number(front_sdl_impl* impl, uint32_t num, uint16_t x,
+                           uint16_t y) {
+  SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
+  if (!num) {
+    SDL_RenderCopy(impl->renderer, impl->numbers[0], NULL, &dest);
+  }
+  while (num) {
+    SDL_RenderCopy(impl->renderer, impl->numbers[num % 10], NULL, &dest);
+    dest.x -= 4;
+    num /= 10;
   }
 }
 
@@ -149,9 +162,41 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
   mapper* mapper = impl->front->sys->mapper;
   uint16_t pc = impl->front->sys->cpu->program_counter;
   switch (impl->front->tab) {
-    case FT_SCREEN:
-      break;
     case FT_PPU: {
+      // Number of sprites in the OAM
+      ppu* ppu = impl->front->sys->ppu;
+      display_number(impl, ppu->spr_count_max, 240, 8);
+      uint16_t spr_y = 16;
+      for (int i = 0; i < 64; i++) {
+        uint8_t y = ppu->oam.raw[i * 4];
+        uint8_t index = ppu->oam.raw[i * 4 + 1];
+        uint8_t attr = ppu->oam.raw[i * 4 + 2];
+        uint8_t x = ppu->oam.raw[i * 4 + 3];
+        if (y < 0xEF) {
+          display_number(impl, y, 150, spr_y);
+          display_number(impl, index, 180, spr_y);
+          display_number(impl, attr, 210, spr_y);
+          display_number(impl, x, 240, spr_y);
+          spr_y += 8;
+        }
+      }
+
+      // Display the PPU palette
+      SDL_Rect rect;
+      rect.w = 16;
+      rect.h = 8;
+      for (int i = 0; i < 32; i++) {
+        uint32_t colour = impl->palette[impl->front->sys->ppu->palette[i]];
+        SDL_SetRenderDrawColor(impl->renderer, colour >> 16, colour >> 8,
+                               colour, 0xFF);
+        rect.x = (i % 16) * 16;
+        rect.y = (i / 16) * 8 + 240;
+        SDL_RenderFillRect(impl->renderer, &rect);
+      }
+    } break;
+    case FT_MMC_CPU:  // pass through
+    case FT_MMC_PPU: {
+      // Display the memory map
       if (mapper != NULL) {
         uint32_t* pixels;
         uint32_t pitch;
@@ -159,12 +204,22 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
                             (void*)&pitch)) {
           // printf("err: %s\n", SDL_GetError());
         } else {
-          for (uint32_t i = 0; i < 0x4000; i++) {
-            uint8_t val = mmap_ppu_read(mapper, i);
-            pixels[i * 4] = 0xFF000000 | ((val >> 6) * 0x404040);
-            pixels[i * 4 + 1] = 0xFF000000 | (((val >> 4) & 0x3) * 0x404040);
-            pixels[i * 4 + 2] = 0xFF000000 | (((val >> 2) & 0x3) * 0x404040);
-            pixels[i * 4 + 3] = 0xFF000000 | ((val & 0x3) * 0x404040);
+          if (impl->front->tab == FT_MMC_CPU) {
+            for (uint32_t i = 0; i < 0x10000; i++) {
+              pixels[i] =
+                  0xFF000000 | (mmap_cpu_read(mapper, i, true) * 0x10101);
+              if (i == pc) {
+                pixels[i] = 0xFFFF0000;
+              }
+            }
+          } else {
+            for (uint32_t i = 0; i < 0x4000; i++) {
+              uint8_t val = mmap_ppu_read(mapper, i);
+              pixels[i * 4] = 0xFF000000 | ((val >> 6) * 0x404040);
+              pixels[i * 4 + 1] = 0xFF000000 | (((val >> 4) & 0x3) * 0x404040);
+              pixels[i * 4 + 2] = 0xFF000000 | (((val >> 2) & 0x3) * 0x404040);
+              pixels[i * 4 + 3] = 0xFF000000 | ((val & 0x3) * 0x404040);
+            }
           }
           SDL_UnlockTexture(impl->screen_tex);
           src.x = dest.x = 0;
@@ -172,25 +227,6 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
           src.w = dest.w = 256;
           src.h = dest.h = 256;
           SDL_RenderCopy(impl->renderer, impl->screen_tex, &src, &dest);
-        }
-      }
-    } break;
-    case FT_MMC: {
-      if (mapper != NULL) {
-        uint32_t* pixels;
-        uint32_t pitch;
-        if (SDL_LockTexture(impl->screen_tex, NULL, (void**)&pixels,
-                            (void*)&pitch)) {
-          // printf("err: %s\n", SDL_GetError());
-        } else {
-          for (uint32_t i = 0; i < 0x10000; i++) {
-            pixels[i] = 0xFF000000 | (mmap_cpu_read(mapper, i) * 0x10101);
-            if (i == pc) {
-              pixels[i] = 0xFFFF0000;
-            }
-          }
-          SDL_UnlockTexture(impl->screen_tex);
-          SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, NULL);
         }
       }
     } break;
@@ -212,7 +248,7 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
     bool sel = false;
     for (int i = 0; i < BUTTON_NUM; i++) {
       sel = impl->mouse_x >= i * 16 && impl->mouse_x < i * 16 + 16;
-      if (i >= BUTTON_CPU && i <= BUTTON_MMC &&
+      if (i >= BUTTON_CPU && i <= BUTTON_MMC_PPU &&
           impl->front->tab == i - BUTTON_CPU + FT_CPU) {
         src.x = 16;
       }
@@ -239,8 +275,8 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
     src.y = 64;
     src.w = dest.w = 24;
     src.h = dest.h = 24;
-    dest.x = 24;
-    dest.y = 24;
+    dest.x = 116;
+    dest.y = 116;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
   SDL_RenderPresent(impl->renderer);
@@ -281,17 +317,21 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   impl->mouse_y = -1;
 
   // Initialise palette
-  for (int i = 0; i < 32; i++) {
+  for (int i = 0; i < 16 * 4; i++) {
     impl->palette[i] =
-        0xFF000000 | ((uint32_t*)ui->pixels)[(i % 16) * 8 + (i >> 8) * ui->w];
+        0xFF000000 |
+        ((uint32_t*)ui->pixels)[(i % 16) * 8 + (i / 16) * ui->w * 8];
   }
 
   // Create window
-  uint32_t width = region_screen_width(front->sys->region) * front->scale;
-  uint32_t height = region_screen_height(front->sys->region) * front->scale;
+  uint32_t width = 256;
+  // region_screen_width(front->sys->region) * front->scale;
+  uint32_t height = 256;
+  // region_screen_height(front->sys->region) * front->scale;
   impl->window =
       SDL_CreateWindow("pines", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
                        width, height, SDL_WINDOW_OPENGL);
+
   if (!impl->window) {
     fprintf(stderr, "Could not create window\n");
     SDL_FreeSurface(ui);
@@ -317,6 +357,19 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
     free(impl);
     return NULL;
   }
+
+  // Create numbers
+  *impl->numbers = calloc(10, sizeof(SDL_Texture*));
+  SDL_Rect src = {.x = 48, .y = 32, .w = 8, .h = 8};
+  for (int i = 0; i < 10; i++) {
+    impl->numbers[i] =
+        SDL_CreateTexture(impl->renderer, SDL_PIXELFORMAT_ARGB8888,
+                          SDL_TEXTUREACCESS_TARGET, 8, 8);
+    SDL_SetRenderTarget(impl->renderer, impl->numbers[i]);
+    SDL_RenderCopy(impl->renderer, impl->ui, &src, NULL);
+    src.x += 8;
+  }
+  SDL_SetRenderTarget(impl->renderer, NULL);
 
   // Create surface for main screen
   impl->screen_tex = SDL_CreateTexture(impl->renderer, SDL_PIXELFORMAT_ARGB8888,
