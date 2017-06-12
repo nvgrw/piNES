@@ -21,6 +21,7 @@ typedef struct {
   SDL_Renderer* renderer;
   SDL_Texture* ui;
   SDL_Texture* screen_tex;
+  SDL_Texture* numbers[10];
   uint32_t palette[64];
   uint32_t screen_pix[PPU_SCREEN_SIZE];
 

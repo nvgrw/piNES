@@ -136,6 +136,18 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
   }
 }
 
+static void display_number(front_sdl_impl* impl, uint32_t num, uint16_t x, uint16_t y) {
+  SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
+  if (!num) {
+    SDL_RenderCopy(impl->renderer, impl->numbers[0], NULL, &dest);
+  }
+  while (num) {
+    SDL_RenderCopy(impl->renderer, impl->numbers[num % 10], NULL, &dest);
+    dest.x -= 4;
+    num /= 10;
+  }
+}
+
 void front_sdl_impl_flip(front_sdl_impl* impl) {
   SDL_Rect src;
   SDL_Rect dest;
@@ -144,6 +156,24 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
   uint16_t pc = impl->front->sys->cpu->program_counter;
   switch (impl->front->tab) {
     case FT_PPU: {
+      // Number of sprites in the OAM
+      ppu* ppu = impl->front->sys->ppu;
+      display_number(impl, ppu->spr_count_max, 240, 8);
+      uint16_t spr_y = 16;
+      for (int i = 0; i < 64; i++) {
+        uint8_t y = ppu->oam.raw[i * 4];
+        uint8_t index = ppu->oam.raw[i * 4 + 1];
+        uint8_t attr = ppu->oam.raw[i * 4 + 2];
+        uint8_t x = ppu->oam.raw[i * 4 + 3];
+        if (y < 0xEF) {
+          display_number(impl, y, 150, spr_y);
+          display_number(impl, index, 180, spr_y);
+          display_number(impl, attr, 210, spr_y);
+          display_number(impl, x, 240, spr_y);
+          spr_y += 8;
+        }
+      }
+
       // Display the PPU palette
       SDL_Rect rect;
       rect.w = 16;
@@ -237,8 +267,8 @@ void front_sdl_impl_flip(front_sdl_impl* impl) {
     src.y = 64;
     src.w = dest.w = 24;
     src.h = dest.h = 24;
-    dest.x = 24;
-    dest.y = 24;
+    dest.x = 116;
+    dest.y = 116;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
   SDL_RenderPresent(impl->renderer);
@@ -312,6 +342,18 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
     free(impl);
     return NULL;
   }
+
+  // Create numbers
+  *impl->numbers = calloc(10, sizeof(SDL_Texture*));
+  SDL_Rect src = {.x = 48, .y = 32, .w = 8, .h = 8};
+  for (int i = 0; i < 10; i++) {
+    impl->numbers[i] = SDL_CreateTexture(impl->renderer, SDL_PIXELFORMAT_ARGB8888,
+                                         SDL_TEXTUREACCESS_TARGET, 8, 8);
+    SDL_SetRenderTarget(impl->renderer, impl->numbers[i]);
+    SDL_RenderCopy(impl->renderer, impl->ui, &src, NULL);
+    src.x += 8;
+  }
+  SDL_SetRenderTarget(impl->renderer, NULL);
 
   // Create surface for main screen
   impl->screen_tex = SDL_CreateTexture(impl->renderer, SDL_PIXELFORMAT_ARGB8888,

@@ -274,8 +274,9 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
     mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE] = val;
     return;
-  }if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) || address == 0x4014) {
-    ppu_mem_write((ppu*)mapper->ppu, ((address - MC_PPU_CTRL_BASE) % MC_PPU_CTRL_SIZE) + MC_PPU_CTRL_BASE, val);
+  }
+  if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) || address == 0x4014) {
+    ppu_mem_write((ppu*)mapper->ppu, address, val);
     return;
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {

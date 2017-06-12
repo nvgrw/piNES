@@ -192,6 +192,16 @@ typedef struct {
     uint32_t raw32[64];
     uint8_t raw[256];
   } oam;
+  uint8_t oam_address;
+
+  uint16_t spr_count;
+  uint32_t spr_pat[8];
+  uint8_t spr_pos[8];
+  uint8_t spr_priority[8];
+  uint8_t spr_index[8];
+
+  uint16_t spr_count_max;
+  /*
   union {
     oam_sprite sprites[8];
     uint32_t raw32[8];
@@ -199,11 +209,11 @@ typedef struct {
   } oam_secondary, oam_tertiary;
   oam_state oam_secondary_state[8];
   oam_state oam_tertiary_state[8];
-  uint8_t oam_address;
   uint8_t oam_spr_n;
   uint8_t oam_spr_count;
   uint8_t spr_ren_pos;
   uint8_t spr_ren_count;
+  */
 
   // Visual output
   ppu_driver driver;
