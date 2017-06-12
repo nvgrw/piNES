@@ -48,13 +48,15 @@ const uint16_t APU_NOISE_TABLE[] = {4,   8,   16,  32,  64,  96,   128,  160,
 
 apu* apu_init(void) { return calloc(1, sizeof(apu)); }
 
-uint8_t apu_clock_envelope(const apu_dve* dve, apu_envelope* envelope) {
+/* ----- ENVELOPE ----- */
+static void apu_clock_specific_envelope(const apu_dve dve,
+                                        apu_unit_envelope* envelope) {
   if (!envelope->start_flag) {
     if (envelope->divider == 0) {
-      envelope->divider = dve->data.divider_period;
+      envelope->divider = dve.data.divider_period;
       if (envelope->decay_level_counter != 0) {
         envelope->decay_level_counter--;
-      } else if (dve->data.length_counter_halt) {
+      } else if (dve.data.length_counter_halt) {
         envelope->decay_level_counter = 15;
       }
     } else {
@@ -63,78 +65,137 @@ uint8_t apu_clock_envelope(const apu_dve* dve, apu_envelope* envelope) {
   } else {
     envelope->start_flag = false;
     envelope->decay_level_counter = 15;
-    envelope->divider = dve->data.divider_period;
+    envelope->divider = dve.data.divider_period;
   }
 
-  if (dve->data.constant_volume_envelope) {
-    return 15;
+  if (dve.data.constant_volume_envelope) {
+    envelope->last_value = 15;
   } else {
-    return envelope->decay_level_counter;
+    envelope->last_value = envelope->decay_level_counter;
   }
 }
 
-void apu_pulse1_calculate(apu* apu) {
-  // Components of the pulse channel
-  // Envelope
-  // Sweep
-  // Length counter
-  //
-  // The envelope is the way that a sound's parameter changes over time. The NES
-  // emvelope generates a decreasing saw envelope with optional looping, or a
-  // constant volume.
-
-  apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1)};
-  apu_lclt par_b = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG4)};
-
-  uint8_t volume = apu_clock_envelope(&par_a, &apu->pulse1_envelope);
+static void apu_clock_envelope(apu* apu) {
+  // Update envelopes
+  {
+    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1)};
+    apu_clock_specific_envelope(dve, &apu->pulse1_envelope);
+  }
+  {
+    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG1)};
+    apu_clock_specific_envelope(dve, &apu->pulse2_envelope);
+  }
+  {
+    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG1)};
+    apu_clock_specific_envelope(dve, &apu->noise_envelope);
+  }
 }
 
-void apu_pulse2_calculate(apu* apu) {
-  apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG1)};
-  apu_lclt par_b = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG4)};
+/* ----- SWEEP ----- */
+static void apu_clock_specific_sweep(apu* apu, const register_4001_4005 flags,
+                                     apu_unit_sweep* unit, uint16_t reg3,
+                                     uint16_t reg4) {
+  if (!flags.data.enabled) {
+    return;  // ??
+  }
 
-  uint8_t volume = apu_clock_envelope(&par_a, &apu->pulse2_envelope);
+  register_4002_4006 par_b = {.raw = mmap_cpu_read(apu->mapper, reg3)};
+  apu_lclt par_c = {.raw = mmap_cpu_read(apu->mapper, reg4)};
+  uint16_t raw_period = (((uint16_t)par_c.data_period.timer_high) << 8) |
+                        (uint16_t)par_b.data.timer_low;
+
+  if (!flags.data.enabled) {
+    unit->last_period = raw_period;
+    return;
+  }
+
+  uint16_t target_period = raw_period >> flags.data.shift_count;
+  if (!flags.data.negate) {
+    target_period = raw_period + target_period;
+  } else {
+    target_period = raw_period - target_period;
+  }
+
+  if (unit->reload) {
+    if (unit->divider == 0) {
+      unit->last_period = target_period;
+    }
+    unit->divider = flags.data.period;
+    unit->reload = false;
+  } else {
+    if (unit->divider != 0) {
+      unit->divider--;
+    } else {
+      unit->divider = flags.data.period;
+      unit->last_period = target_period;
+    }
+  }
 }
 
-void apu_triangle_calculate(apu* apu) {}
+/* ----- PULSE CALCULATION ----- */
+static void apu_pulse1_calculate(apu* apu) {
+  // apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1)};
+  // register_4002_4006 par_b = {.raw = mmap_cpu_read(apu->mapper,
+  // PULSE1_REG3)}; apu_lclt par_c = {.raw = mmap_cpu_read(apu->mapper,
+  // PULSE1_REG4)};
 
-void apu_noise_calculate(apu* apu) {
-  apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG1)};
-  apu_lclt par_b = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG3)};
+  //   uint16_t raw_period = (((uint16_t)par_c.data_period.timer_high) << 8) |
+  //                         (uint16_t)par_b.data.timer_low;
 
-  uint8_t volume = apu_clock_envelope(&par_a, &apu->noise_envelope);
+  if (apu->pulse1_channel.sequence_counter == 0) {
+    // The waveform generator is clocked every time the counter goes to zero
+    // Either use sweep unit period or raw period, depending on mute settings.
+    // apu->pulse1_channel.sequence_counter = raw_period;
+    apu->pulse1_channel.sequence_counter = apu->pulse1_sweep.last_period;
+  }
+  // TODO: Implement duty cycle sequences
+  // & pulse 2
+  apu->last_pulse1 = apu->pulse1_envelope.last_value;
 }
 
-void apu_dmc_calculate(apu* apuc) {}
+// static void apu_pulse2_calculate(apu* apu) {}
 
-uint8_t apu_pulses_output(apu* apu) {
+// static void apu_triangle_calculate(apu* apu) {}
+
+// static void apu_noise_calculate(apu* apu) {}
+
+// static void apu_dmc_calculate(apu* apuc) {}
+
+static uint8_t apu_pulses_output(apu* apu) {
   // This formula is a linear approximation
   return 0.00752 * (apu->last_pulse1 + apu->last_pulse2);
 }
 
-uint8_t apu_tnd_output(apu* apu) {
+static uint8_t apu_tnd_output(apu* apu) {
   return 0.00851 * apu->last_triangle + 0.00494 * apu->last_noise +
          0.00335 * apu->last_dmc;
 }
 
 void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {}
 
-void apu_write_to_buffer(apu* apu, uint8_t value) {
+static void apu_write_to_buffer(apu* apu, uint8_t value) {
   apu->buffer[apu->buffer_cursor] = value;
   apu->buffer_cursor++;
   apu->buffer_cursor = apu->buffer_cursor % AUDIO_BUFFER_SIZE;
 }
 
-void apu_sequencer_cycle(apu* apu) {
-  // Get the current mode
+static void apu_sequencer_cycle(apu* apu) {
+  // Frame counter (drives envelope)
   register_4017_frame_counter fc = {
       .raw = mmap_cpu_read(apu->mapper, FRAME_COUNTER)};
   register_4015_status status = {.raw = mmap_cpu_read(apu->mapper, STATUS)};
   if (fc.data.mode == 0) {
     // Counter mode 0
     if (apu->sequencer_elapsed_apu_cycles >= 14915) {
-      apu_pulse1_calculate(apu);
-      apu_pulse2_calculate(apu);
+      apu_clock_envelope(apu);
+      register_4001_4005 flags_pulse1 = {
+          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2)};
+      apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
+                               PULSE1_REG3, PULSE1_REG4);
+      register_4001_4005 flags_pulse2 = {
+          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2)};
+      apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
+                               PULSE2_REG3, PULSE2_REG4);
       apu->sequencer_elapsed_apu_cycles = 0;
     } else if (apu->sequencer_elapsed_apu_cycles >= 14914) {
       if (!fc.data.irq_inhibit) {
@@ -149,31 +210,48 @@ void apu_sequencer_cycle(apu* apu) {
         mmap_cpu_write(apu->mapper, STATUS, status.raw);
       }
     } else if (apu->sequencer_elapsed_apu_cycles >= 11186) {
-      apu_pulse1_calculate(apu);
-      apu_pulse2_calculate(apu);
+      apu_clock_envelope(apu);
     } else if (apu->sequencer_elapsed_apu_cycles >= 7457) {
-      apu_pulse1_calculate(apu);
-      apu_pulse2_calculate(apu);
+      apu_clock_envelope(apu);
+      register_4001_4005 flags_pulse1 = {
+          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2)};
+      apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
+                               PULSE1_REG3, PULSE1_REG4);
+      register_4001_4005 flags_pulse2 = {
+          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2)};
+      apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
+                               PULSE2_REG3, PULSE2_REG4);
     } else if (apu->sequencer_elapsed_apu_cycles >= 3729) {
-      apu_pulse1_calculate(apu);
-      apu_pulse2_calculate(apu);
+      apu_clock_envelope(apu);
     }
   } else if (fc.data.mode == 1) {
     // Counter mode 1
     if (apu->sequencer_elapsed_apu_cycles >= 18641) {
-      apu_pulse1_calculate(apu);
-      apu_pulse2_calculate(apu);
+      apu_clock_envelope(apu);
+      register_4001_4005 flags_pulse1 = {
+          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2)};
+      apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
+                               PULSE1_REG3, PULSE1_REG4);
+      register_4001_4005 flags_pulse2 = {
+          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2)};
+      apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
+                               PULSE2_REG3, PULSE2_REG4);
       apu->sequencer_elapsed_apu_cycles = 0;
     } else if (apu->sequencer_elapsed_apu_cycles >= 14915) {
     } else if (apu->sequencer_elapsed_apu_cycles >= 11186) {
-      apu_pulse1_calculate(apu);
-      apu_pulse2_calculate(apu);
+      apu_clock_envelope(apu);
     } else if (apu->sequencer_elapsed_apu_cycles >= 7457) {
-      apu_pulse1_calculate(apu);
-      apu_pulse2_calculate(apu);
+      apu_clock_envelope(apu);
+      register_4001_4005 flags_pulse1 = {
+          .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2)};
+      apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
+                               PULSE1_REG3, PULSE1_REG4);
+      register_4001_4005 flags_pulse2 = {
+          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2)};
+      apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
+                               PULSE2_REG3, PULSE2_REG4);
     } else if (apu->sequencer_elapsed_apu_cycles >= 3729) {
-      apu_pulse1_calculate(apu);
-      apu_pulse2_calculate(apu);
+      apu_clock_envelope(apu);
     }
   }
 
@@ -197,6 +275,8 @@ void apu_cycle(apu* apu, void* context,
     apu_sequencer_cycle(apu);
   }
   apu->is_even_cycle = !apu->is_even_cycle;
+
+  apu_pulse1_calculate(apu);
 
   // Create output
   uint8_t val = apu_pulses_output(apu) + apu_tnd_output(apu);

@@ -99,12 +99,6 @@ typedef union {
 
 typedef union {
   struct {
-  } data;
-  uint8_t raw;
-} register_400c;
-
-typedef union {
-  struct {
     uint8_t period : 4;
     uint8_t : 3;
     uint8_t mode : 1;
@@ -171,7 +165,16 @@ typedef struct {
   bool start_flag;
   uint8_t divider;
   uint8_t decay_level_counter;
-} apu_envelope;
+  uint8_t last_value;
+} apu_unit_envelope;
+
+typedef struct {
+  uint8_t divider;
+  bool reload;
+  uint16_t last_period;
+} apu_unit_sweep;
+
+typedef struct { uint16_t sequence_counter; } apu_pulse_channel;
 
 typedef struct {
   mapper* mapper;
@@ -182,9 +185,17 @@ typedef struct {
   uint32_t sequencer_elapsed_apu_cycles;
 
   // Envelopes
-  apu_envelope pulse1_envelope;
-  apu_envelope pulse2_envelope;
-  apu_envelope noise_envelope;
+  apu_unit_envelope pulse1_envelope;
+  apu_unit_envelope pulse2_envelope;
+  apu_unit_envelope noise_envelope;
+
+  // Sweep
+  apu_unit_sweep pulse1_sweep;
+  apu_unit_sweep pulse2_sweep;
+
+  // Pulse channels
+  apu_pulse_channel pulse1_channel;
+  apu_pulse_channel pulse2_channel;
 
   // Outputting sound
   uint8_t cycle_count;
