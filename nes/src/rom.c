@@ -287,7 +287,6 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
     apu_mem_write(mapper->apu, address, val);
   }
 
-  mapper->mapped.prg_rom1[address % 0x4000] = val;
   return;
 
   if (address >= MC_SRAM_BASE && address < MC_SRAM_UPPER) {
