@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#include "apu_channels.h"
 #include "rom.h"
 
 #define APU_SAMPLE_RATE 1789800.0
@@ -31,7 +32,7 @@ typedef union {
     uint8_t : 2;
   } data_noise;
   uint8_t raw;
-} apu_dve;
+} apu_register_4000_4004_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -41,14 +42,14 @@ typedef union {
     uint8_t enabled : 1;
   } data;
   uint8_t raw;
-} register_4001_4005;
+} apu_register_4001_4005_t;
 
 typedef union {
   struct __attribute__((packed)) {
     uint8_t timer_low : 8;
   } data;
   uint8_t raw;
-} register_4002_4006;
+} apu_register_4002_4006_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -64,7 +65,7 @@ typedef union {
     uint8_t length_counter_load : 5;
   } data_noise;
   uint8_t raw;
-} apu_lclt;
+} apu_register_4003_4007_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -72,14 +73,14 @@ typedef union {
     uint8_t control : 1;
   } data;
   uint8_t raw;
-} register_4008;
+} apu_register_4008_t;
 
 typedef union {
   struct __attribute__((packed)) {
     uint8_t timer_low : 8;
   } data;
   uint8_t raw;
-} register_400a;
+} apu_register_400a_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -87,7 +88,7 @@ typedef union {
     uint8_t length_counter_load;
   } data;
   uint8_t raw;
-} register_400b;
+} apu_register_400b_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -96,7 +97,7 @@ typedef union {
     uint8_t mode : 1;
   } data;
   uint8_t raw;
-} register_400e;
+} apu_register_400e_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -106,7 +107,7 @@ typedef union {
     uint8_t irq_enabled : 1;
   } data;
   uint8_t raw;
-} register_4010;
+} apu_register_4010_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -114,21 +115,21 @@ typedef union {
     uint8_t : 1;
   } data;
   uint8_t raw;
-} register_4011;
+} apu_register_4011_t;
 
 typedef union {
   struct __attribute__((packed)) {
     uint8_t sample_address : 8;
   } data;
   uint8_t raw;
-} register_4012;
+} apu_register_4012_t;
 
 typedef union {
   struct __attribute__((packed)) {
     uint8_t sample_length : 8;
   } data;
   uint8_t raw;
-} register_4013;
+} apu_register_4013_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -142,7 +143,7 @@ typedef union {
     uint8_t dmc_interrupt : 1;
   } data;
   uint8_t raw;
-} register_4015_status;
+} apu_register_4015_status;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -151,9 +152,9 @@ typedef union {
     uint8_t mode : 1;
   } data;
   uint8_t raw;
-} register_4017_frame_counter;
+} apu_register_4017_frame_counter_t;
 
-typedef struct {
+typedef struct apu {
   mapper* mapper;
 
   // Outputting sound
@@ -162,6 +163,13 @@ typedef struct {
   uint8_t buffer[AUDIO_BUFFER_SIZE];
   int buffer_cursor;
   bool is_even_cycle;
+
+  // Channels
+  apu_channel_pulse_t channel_pulse1;
+  apu_channel_pulse_t channel_pulse2;
+  apu_channel_triangle_t channel_triangle;
+  apu_channel_noise_t channel_noise;
+  apu_channel_dmc_t channel_dmc;
 } apu_t;
 
 /**
