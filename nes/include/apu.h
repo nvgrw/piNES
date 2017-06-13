@@ -10,15 +10,7 @@
 #define APU_ACTUAL_SAMPLE_RATE 44100
 #define AUDIO_BUFFER_SIZE 256
 
-/**
- * Lookup tables for the channels
- * TODO: May not actually need to be externed
- */
-extern const uint8_t APU_LENGTH_TABLE[];
-extern const uint8_t APU_DUTY_TABLE[];
-extern const uint16_t APU_NOISE_TABLE[];
-
-// Bitfields
+// Register bitfields
 typedef union {
   struct __attribute__((packed)) {
     uint8_t divider_period : 4;
@@ -162,43 +154,7 @@ typedef union {
 } register_4017_frame_counter;
 
 typedef struct {
-  bool start_flag;
-  uint8_t divider;
-  uint8_t decay_level_counter;
-  uint8_t last_value;
-} apu_unit_envelope;
-
-typedef struct {
-  uint8_t divider;
-  bool reload;
-  uint16_t last_period;
-} apu_unit_sweep;
-
-typedef struct {
-  uint16_t sequence_counter;
-  uint16_t initial_sequence_counter;
-} apu_pulse_channel;
-
-typedef struct {
   mapper* mapper;
-
-  bool linear_counter_reload;
-
-  // Sequencer
-  uint32_t sequencer_elapsed_apu_cycles;
-
-  // Envelopes
-  apu_unit_envelope pulse1_envelope;
-  apu_unit_envelope pulse2_envelope;
-  apu_unit_envelope noise_envelope;
-
-  // Sweep
-  apu_unit_sweep pulse1_sweep;
-  apu_unit_sweep pulse2_sweep;
-
-  // Pulse channels
-  apu_pulse_channel pulse1_channel;
-  apu_pulse_channel pulse2_channel;
 
   // Outputting sound
   uint8_t cycle_count;
@@ -206,8 +162,6 @@ typedef struct {
   uint8_t buffer[AUDIO_BUFFER_SIZE];
   int buffer_cursor;
   bool is_even_cycle;
-
-  uint8_t last_pulse1, last_pulse2, last_triangle, last_noise, last_dmc;
 } apu_t;
 
 /**
