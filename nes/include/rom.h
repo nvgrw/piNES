@@ -156,6 +156,7 @@ typedef struct {
     //uint8_t* ppu_palettes;
   } mapped;
 
+  void* controller;
   void* cpu;
   void* ppu;
 } mapper;

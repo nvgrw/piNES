@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "controller.h"
 #include "cpu.h"
 #include "ppu.h"
 #include "sys.h"
@@ -16,10 +17,14 @@ sys* sys_init(void) {
   ret->cpu = cpu_init();
   ret->ppu = ppu_init();
   //ret->apu = apu_init();
+  ret->controller = controller_init();
   ret->mapper = NULL;
   ret->region = R_NTSC;
   ret->status = SS_NONE;
   ret->running = false;
+  for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
+    (*CONTROLLER_DRIVERS[i].init)();
+  }
   return ret;
 }
 
@@ -40,12 +45,22 @@ void sys_run(sys* sys, uint32_t ms) {
       }
 
       ppu_cycle(sys->ppu);
-
       // apu cycle
 
       sys->clock -= CLOCK_PERIOD;
     }
+
+    if (sys->ppu->flip) {
+      controller_clear(sys->controller);
+      for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
+        (*CONTROLLER_DRIVERS[i].poll)(sys->controller);
+      }
+    }
   }
+}
+
+static void sys_reset(sys* sys) {
+  cpu_reset(sys->cpu);
 }
 
 void sys_rom(sys* sys, char* path) {
@@ -69,8 +84,10 @@ void sys_rom(sys* sys, char* path) {
   if (sys->mapper != NULL) {
     sys->cpu->mapper = sys->mapper;
     sys->ppu->mapper = sys->mapper;
+    sys->mapper->controller = sys->controller;
     sys->mapper->cpu = sys->cpu;
     sys->mapper->ppu = sys->ppu;
+    sys_reset(sys);
   }
 }
 
@@ -79,13 +96,12 @@ void sys_start(sys* sys) {
     sys->status = SS_ROM_MISSING;
     return;
   }
-  cpu_reset(sys->cpu);
   sys->running = true;
 }
 
 void sys_stop(sys* sys) {
   sys->running = false;
-  // also reset
+  sys_reset(sys);
 }
 
 void sys_pause(sys* sys) {
@@ -113,6 +129,10 @@ void sys_test(sys* sys) {
 }
 
 void sys_deinit(sys* sys) {
+  for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
+    (*CONTROLLER_DRIVERS[i].deinit)();
+  }
+  controller_deinit(sys->controller);
   ppu_deinit(sys->ppu);
   cpu_deinit(sys->cpu);
   free(sys);

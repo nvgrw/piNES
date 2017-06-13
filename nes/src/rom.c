@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "controller.h"
 #include "cpu.h"
 #include "mappers.h"
 #include "ppu.h"
@@ -280,8 +281,7 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
     return;
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
-    // TODO: Call aurel's function to deal with register writes
-    // mapped.registers[address - MC_REGISTERS_BASE] = val;
+    controller_mem_write(mapper->controller, address, val);
     return;
   }
 
@@ -305,7 +305,7 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
     return ppu_mem_read((ppu*)mapper->ppu, address, dummy);
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
-    return 0; //mapper->mapped.registers[address - MC_REGISTERS_BASE];
+    return controller_mem_read(mapper->controller, address);
   }
   return mapper->mapped.prg_rom1[address % 0x4000];
 

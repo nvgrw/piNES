@@ -17,14 +17,14 @@
  * SDL-specific front data.
  */
 typedef struct {
+  // SDL and video-related
   SDL_Window* window;
   SDL_Renderer* renderer;
   SDL_Texture* ui;
   SDL_Texture* screen_tex;
-  SDL_Texture* numbers[10];
   uint32_t palette[64];
-  uint32_t screen_pix[PPU_SCREEN_SIZE];
 
+  // Mouse-related
   int32_t mouse_x;
   int32_t mouse_y;
   bool mouse_down;
@@ -38,8 +38,12 @@ typedef struct {
  */
 front_sdl_impl* front_sdl_impl_init();
 
+/**
+ * Enters the main loop of the SDL front.
+ */
 void front_sdl_impl_run(front_sdl_impl* front);
 
-void front_sdl_impl_flip(front_sdl_impl* front);
-
+/**
+ * Frees any memory allocated with the SDL front, and quits SDL.
+ */
 void front_sdl_impl_deinit(front_sdl_impl* front);

@@ -1,111 +1,85 @@
-#include <stdbool.h>
-#include <stdlib.h>
-
-#ifdef IS_PI
-#include <pigpio.h>
-#endif
-
 #include "controller.h"
+#include "controller_nes.h"
+#include "controller_sdl.h"
 
-#define LATCH_DURATION 12   // us
-#define PULSE_HALF_CYCLE 6  // us
-// #define LATCH_WAIT 1667 - LATCH_DURATION - PULSE_HALF_CYCLE * 8  // us
+/**
+ * controller.c
+ */
 
-int controller_init(void) {
-#ifdef IS_PI
-  if (gpioInitialise() < 0) {
-    return EXIT_FAILURE;
+#define CTRL_JOYPAD1 0x4016
+#define CTRL_JOYPAD2 0x4017
+
+/**
+ * Public functions
+ * 
+ * See controller.h for descriptions.
+ */
+controller_t* controller_init(void) {
+  return calloc(1, sizeof(controller_t));
+}
+
+void controller_clear(controller_t* ctrl) {
+  ctrl->pressed1.a = 0;
+  ctrl->pressed1.b = 0;
+  ctrl->pressed1.select = 0;
+  ctrl->pressed1.start = 0;
+  ctrl->pressed1.up = 0;
+  ctrl->pressed1.down = 0;
+  ctrl->pressed1.left = 0;
+  ctrl->pressed1.right = 0;
+  ctrl->pressed2.a = 0;
+  ctrl->pressed2.b = 0;
+  ctrl->pressed2.select = 0;
+  ctrl->pressed2.start = 0;
+  ctrl->pressed2.up = 0;
+  ctrl->pressed2.down = 0;
+  ctrl->pressed2.left = 0;
+  ctrl->pressed2.right = 0;
+}
+
+void controller_deinit(controller_t* ctrl) {
+  free(ctrl);
+}
+
+void controller_mem_write(controller_t* ctrl, uint16_t address, uint8_t value) {
+  switch (address) {
+    case CTRL_JOYPAD1:
+      if (value & 0x1) {
+        ctrl->status1 = ctrl->status2 = CS_STROBE;
+      } else {
+        ctrl->status1 = ctrl->status2 = CS_PULL_A;
+      }
+      break;
   }
-
-  // Pin 17: cntrl_1 data
-  gpioSetMode(17, PI_INPUT);
-  // Pin 22: cntrl_2 data
-  gpioSetMode(22, PI_INPUT);
-
-  // Pin 18: latch
-  gpioSetMode(18, PI_OUTPUT);
-  // Pin 27: pulse
-  gpioSetMode(27, PI_OUTPUT);
-#endif
-
-  return EXIT_SUCCESS;
 }
 
-void deinit_controller(void) {
+uint8_t controller_mem_read(controller_t* ctrl, uint16_t address) {
+  if (address == CTRL_JOYPAD1 || address == CTRL_JOYPAD2) {
+    controller_status_t* ctrl_status = &ctrl->status1;
+    controller_pressed_t* ctrl_pressed = &ctrl->pressed1;
+    if (address == CTRL_JOYPAD2) {
+      ctrl_status = &ctrl->status2;
+      ctrl_pressed = &ctrl->pressed2;
+    }
+    switch (*ctrl_status) {
+      case CS_STROBE: return ctrl_pressed->a;
+      case CS_PULL_A: (*ctrl_status)++; return ctrl_pressed->a;
+      case CS_PULL_B: (*ctrl_status)++; return ctrl_pressed->b;
+      case CS_PULL_SELECT: (*ctrl_status)++; return ctrl_pressed->select;
+      case CS_PULL_START: (*ctrl_status)++; return ctrl_pressed->start;
+      case CS_PULL_UP: (*ctrl_status)++; return ctrl_pressed->up;
+      case CS_PULL_DOWN: (*ctrl_status)++; return ctrl_pressed->down;
+      case CS_PULL_LEFT: (*ctrl_status)++; return ctrl_pressed->left;
+      case CS_PULL_RIGHT: (*ctrl_status)++; return ctrl_pressed->right;
+      default: return 0;
+    }
+  }
+  return 0;
+}
+
+const controller_driver_t CONTROLLER_DRIVERS[NUM_CONTROLLER_DRIVERS] = {
 #ifdef IS_PI
-  gpioTerminate();
+  {.init = &controller_nes_init, .poll = &controller_nes_poll, .deinit = &controller_nes_deinit},
 #endif
-}
-
-void controller_pulse(void) {
-#ifdef IS_PI
-  gpioWrite(27, 1);
-  gpioDelay(PULSE_HALF_CYCLE);
-  gpioWrite(27, 0);
-#endif
-}
-
-void controller_poll(controller_state* cntrl1_state,
-                     controller_state* cntrl2_state) {
-#ifdef IS_PI
-  // Set latch for 12us
-  gpioWrite(18, 1);
-  gpioDelay(LATCH_DURATION);
-  gpioWrite(18, 0);
-
-  // Poll A
-  cntrl_1_state->a = !gpioRead(17);
-  cntrl_2_state->a = !gpioRead(22);
-  gpioDelay(PULSE_HALF_CYCLE);
-
-  // Poll B
-  controller_pulse();
-  cntrl_1_state->b = !gpioRead(17);
-  cntrl_2_state->b = !gpioRead(22);
-  gpioDelay(PULSE_HALF_CYCLE);
-
-  // Poll SELECT
-  controller_pulse();
-  cntrl_1_state->select = !gpioRead(17);
-  cntrl_2_state->select = !gpioRead(22);
-  gpioDelay(PULSE_HALF_CYCLE);
-
-  // Poll START
-  controller_pulse();
-  cntrl_1_state->start = !gpioRead(17);
-  cntrl_2_state->start = !gpioRead(22);
-  gpioDelay(PULSE_HALF_CYCLE);
-
-  // Poll UP
-  controller_pulse();
-  cntrl_1_state->up = !gpioRead(17);
-  cntrl_2_state->up = !gpioRead(22);
-  gpioDelay(PULSE_HALF_CYCLE);
-
-  // Poll DOWN
-  controller_pulse();
-  cntrl_1_state->down = !gpioRead(17);
-  cntrl_2_state->down = !gpioRead(22);
-  gpioDelay(PULSE_HALF_CYCLE);
-
-  // Poll LEFT
-  controller_pulse();
-  cntrl_1_state->left = !gpioRead(17);
-  cntrl_2_state->left = !gpioRead(22);
-  gpioDelay(PULSE_HALF_CYCLE);
-
-  // Poll RIGHT
-  controller_pulse();
-  cntrl_1_state->right = !gpioRead(17);
-  cntrl_2_state->right = !gpioRead(22);
-  gpioDelay(PULSE_HALF_CYCLE);
-#endif
-}
-
-inline bool has_controller_available(void) {
-#ifdef IS_PI
-  return true;
-#else
-  return false;
-#endif
-}
+  {.init = &controller_sdl_init, .poll = &controller_sdl_poll, .deinit = &controller_sdl_deinit},
+};

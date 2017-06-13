@@ -8,8 +8,14 @@
 #include "region.h"
 #include "sys.h"
 
+/**
+ * nes.c
+ * 
+ * The main entry point of the program.
+ */
+
 int main(int argc, char** argv) {
-  // Initialise the sys
+  // Initialise the system
   sys* sys = sys_init();
 
   // Initialise the front
@@ -32,7 +38,7 @@ int main(int argc, char** argv) {
   // Enter main loop
   front_impl_run(impl);
 
-  // Deinit everything, freeing memory
+  // Deinit everything, free memory
   front_impl_deinit(impl);
   front_deinit(front);
   sys_deinit(sys);
