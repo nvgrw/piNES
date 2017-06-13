@@ -33,6 +33,9 @@
 
 #define BUTTON_NUM 13
 
+/**
+ * Messages displayed when the user changes the display scaling.
+ */
 static char* SCALE_FACTORS[] = {
   "Scale set to 1x",
   "Scale set to 2x",
@@ -330,7 +333,12 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
 
   // Initialise palette
   for (int i = 0; i < 16 * 4; i++) {
-    impl->palette[i] = 0xFF000000 | ((uint32_t*)ui->pixels)[(i % 16) + (i / 16) * ui->w * 8];
+    uint32_t colour = ((uint32_t*)ui->pixels)[(i % 16) + (i / 16) * ui->w * 8];
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    SDL_GetRGB(colour, ui->format, &r, &g, &b);
+    impl->palette[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
   }
 
   // Create window
