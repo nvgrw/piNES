@@ -30,17 +30,17 @@ typedef struct {
  * to start the sequential data polling from a controller.
  */
 typedef enum {
-  CS_NONE,
-  CS_STROBE,
-  CS_PULL_A,
-  CS_PULL_B,
-  CS_PULL_SELECT,
-  CS_PULL_START,
-  CS_PULL_UP,
-  CS_PULL_DOWN,
-  CS_PULL_LEFT,
-  CS_PULL_RIGHT,
-  CS_PULLED
+  CTRLS_NONE,
+  CTRLS_STROBE,
+  CTRLS_PULL_A,
+  CTRLS_PULL_B,
+  CTRLS_PULL_SELECT,
+  CTRLS_PULL_START,
+  CTRLS_PULL_UP,
+  CTRLS_PULL_DOWN,
+  CTRLS_PULL_LEFT,
+  CTRLS_PULL_RIGHT,
+  CTRLS_PULLED
 } controller_status_t;
 
 /**

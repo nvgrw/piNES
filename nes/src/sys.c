@@ -34,14 +34,25 @@ sys* sys_init(void) {
 #define PPU_CYCLES_PER_SECOND (CLOCKS_PER_SECOND / 4.0)
 #define CLOCK_PERIOD (4.0 / CLOCKS_PER_MILLISECOND)
 
-void sys_run(sys* sys, uint32_t ms) {
+bool sys_run(sys* sys, uint32_t ms) {
   if (sys->running) {
     sys->clock += ms;
     while (sys->clock >= CLOCK_PERIOD && sys->running) {
       cpu_nmi(sys->cpu, sys->ppu->nmi);
       if (cpu_cycle(sys->cpu)) {
         // Trapped, stop execution
+        switch (sys->cpu->status) {
+          case CS_TRAPPED:
+            sys->status = SS_CPU_TRAPPED;
+            break;
+          case CS_UNSUPPORTED_INSTRUCTION:
+            sys->status = SS_CPU_UNSUPPORTED_INSTRUCTION;
+            break;
+          default:
+            break;
+        }
         sys->running = false;
+        return true;
       }
 
       ppu_cycle(sys->ppu);
@@ -57,6 +68,7 @@ void sys_run(sys* sys, uint32_t ms) {
       }
     }
   }
+  return false;
 }
 
 static void sys_reset(sys* sys) {

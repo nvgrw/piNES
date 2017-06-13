@@ -45,6 +45,12 @@ typedef struct {
  */
 char* front_rom_dialog(void);
 
+/**
+ * Allocates the memory for a front.
+ */
 front* front_init(sys* sys);
 
+/**
+ * Frees dynamic memory for a front.
+ */
 void front_deinit(front* front);

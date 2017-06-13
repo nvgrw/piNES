@@ -24,7 +24,11 @@ typedef enum {
   // ROM loader errors
   SS_ROM_MISSING,
   SS_ROM_DAMAGED,
-  SS_ROM_MAPPER
+  SS_ROM_MAPPER,
+
+  // CPU errors
+  SS_CPU_TRAPPED,
+  SS_CPU_UNSUPPORTED_INSTRUCTION
 } sys_status;
 
 /**
@@ -50,8 +54,9 @@ sys* sys_init(void);
 
 /**
  * Advances the clock of the system by the given number of milliseconds.
+ * Returns true if the system stopped for any reason.
  */
-void sys_run(sys* sys, uint32_t ms);
+bool sys_run(sys* sys, uint32_t ms);
 
 /**
  * Loads a ROM with the given path.

@@ -45,9 +45,9 @@ void controller_mem_write(controller_t* ctrl, uint16_t address, uint8_t value) {
   switch (address) {
     case CTRL_JOYPAD1:
       if (value & 0x1) {
-        ctrl->status1 = ctrl->status2 = CS_STROBE;
+        ctrl->status1 = ctrl->status2 = CTRLS_STROBE;
       } else {
-        ctrl->status1 = ctrl->status2 = CS_PULL_A;
+        ctrl->status1 = ctrl->status2 = CTRLS_PULL_A;
       }
       break;
   }
@@ -62,15 +62,15 @@ uint8_t controller_mem_read(controller_t* ctrl, uint16_t address) {
       ctrl_pressed = &ctrl->pressed2;
     }
     switch (*ctrl_status) {
-      case CS_STROBE: return ctrl_pressed->a;
-      case CS_PULL_A: (*ctrl_status)++; return ctrl_pressed->a;
-      case CS_PULL_B: (*ctrl_status)++; return ctrl_pressed->b;
-      case CS_PULL_SELECT: (*ctrl_status)++; return ctrl_pressed->select;
-      case CS_PULL_START: (*ctrl_status)++; return ctrl_pressed->start;
-      case CS_PULL_UP: (*ctrl_status)++; return ctrl_pressed->up;
-      case CS_PULL_DOWN: (*ctrl_status)++; return ctrl_pressed->down;
-      case CS_PULL_LEFT: (*ctrl_status)++; return ctrl_pressed->left;
-      case CS_PULL_RIGHT: (*ctrl_status)++; return ctrl_pressed->right;
+      case CTRLS_STROBE: return ctrl_pressed->a;
+      case CTRLS_PULL_A: (*ctrl_status)++; return ctrl_pressed->a;
+      case CTRLS_PULL_B: (*ctrl_status)++; return ctrl_pressed->b;
+      case CTRLS_PULL_SELECT: (*ctrl_status)++; return ctrl_pressed->select;
+      case CTRLS_PULL_START: (*ctrl_status)++; return ctrl_pressed->start;
+      case CTRLS_PULL_UP: (*ctrl_status)++; return ctrl_pressed->up;
+      case CTRLS_PULL_DOWN: (*ctrl_status)++; return ctrl_pressed->down;
+      case CTRLS_PULL_LEFT: (*ctrl_status)++; return ctrl_pressed->left;
+      case CTRLS_PULL_RIGHT: (*ctrl_status)++; return ctrl_pressed->right;
       default: return 0;
     }
   }

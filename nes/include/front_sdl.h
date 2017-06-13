@@ -22,12 +22,17 @@ typedef struct {
   SDL_Renderer* renderer;
   SDL_Texture* ui;
   SDL_Texture* screen_tex;
+  SDL_Texture* prescaled_tex;
   uint32_t palette[64];
 
   // Mouse-related
   int32_t mouse_x;
   int32_t mouse_y;
   bool mouse_down;
+
+  // Display message
+  char message[512];
+  uint32_t message_ticks;
 
   // Common data
   front* front;

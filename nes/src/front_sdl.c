@@ -29,8 +29,15 @@
 #define BUTTON_MMC_CPU 9
 #define BUTTON_MMC_PPU 10
 #define BUTTON_TEST 11
+#define BUTTON_ZOOM 12
 
-#define BUTTON_NUM 12
+#define BUTTON_NUM 13
+
+static char* SCALE_FACTORS[] = {
+  "Scale set to 1x",
+  "Scale set to 2x",
+  "Scale set to 3x",
+};
 
 /**
  * Helper functions
@@ -38,23 +45,83 @@
  * display_number
  *   Displays a number on the UI at the given location.
  * 
+ * display_text
+ *   Displays a string on the UI at the given location.
+ * 
+ * display_message
+ *   Set the current display message to the given string, will display for
+ *   2 seconds.
+ * 
+ * preflip
+ *   Sets up the render target (in case of scaling) and clears the screen.
+ * 
  * flip
  *   Updates the window with the current screen data, and draws any UI
  *   on top of the screen as necessary.
  */
 static void display_number(front_sdl_impl* impl, uint32_t num, uint16_t x, uint16_t y) {
-  SDL_Rect src = {.x = 48, .y = 32, .w = 8, .h = 8};
+  SDL_Rect src = {.x = 144, .y = 0, .w = 8, .h = 8};
   SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
   if (!num) {
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
     return;
   }
   while (num) {
-    src.x = 48 + (num % 10) * 8;
+    uint8_t digit = num % 10;
+    if (digit < 8) {
+      src.x = 144 + digit * 8;
+      src.y = 0;
+    } else {
+      src.x = 16 + (digit - 8) * 8;
+      src.y = 8;
+    }
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
     dest.x -= 4;
     num /= 10;
   }
+}
+
+static void display_text(front_sdl_impl* impl, char* str, uint16_t x, uint16_t y) {
+  SDL_Rect src = {.x = 0, .y = 0, .w = 8, .h = 8};
+  SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
+  while (*str != 0) {
+    uint8_t ch = *str;
+    if (ch >= 97 && ch <= 122) {
+      // Convert to uppercase
+      ch -= 32;
+    }
+    if (ch >= 32 && ch <= 96) {
+      ch -= 32;
+      src.x = 16 + (ch % 24) * 8;
+      src.y = (ch / 24) * 8;
+      SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
+    }
+    dest.x += 4;
+    str++;
+  }
+}
+
+static void display_message(front_sdl_impl* impl, char* str) {
+  size_t len = strlen(str);
+  if (len > 511) {
+    len = 511;
+  }
+  strncpy(impl->message, str, len);
+  impl->message[len] = 0;
+  impl->message_ticks = 2000;
+}
+
+static void preflip(front_sdl_impl* impl) {
+  if (impl->front->scale != 1) {
+    // If there is a scaling factor, we render everything to a texture first
+    SDL_SetRenderTarget(impl->renderer, impl->prescaled_tex);
+  } else {
+    SDL_SetRenderTarget(impl->renderer, NULL);
+  }
+
+  // Fill screen with black
+  SDL_SetRenderDrawColor(impl->renderer, 0, 0, 0, 255);
+  SDL_RenderClear(impl->renderer);
 }
 
 static void flip(front_sdl_impl* impl) {
@@ -162,11 +229,7 @@ static void flip(front_sdl_impl* impl) {
             }
           }
           SDL_UnlockTexture(impl->screen_tex);
-          src.x = dest.x = 0;
-          src.y = dest.y = 0;
-          src.w = dest.w = 256;
-          src.h = dest.h = 256;
-          SDL_RenderCopy(impl->renderer, impl->screen_tex, &src, &dest);
+          SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, NULL);
         }
       }
     } break;
@@ -210,8 +273,10 @@ static void flip(front_sdl_impl* impl) {
     src.w = dest.w = BUTTON_NUM * 16;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
-  if (impl->front->sys->status != SS_NONE) {
-    src.x = 80 + (impl->front->sys->status - 1) * 24;
+
+  // Render system status, if any
+  if (sys->status != SS_NONE) {
+    src.x = 80 + (sys->status - 1) * 24;
     src.y = 64;
     src.w = dest.w = 24;
     src.h = dest.h = 24;
@@ -219,6 +284,17 @@ static void flip(front_sdl_impl* impl) {
     dest.y = 116;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
+
+  // Render display message, if any
+  if (impl->message_ticks) {
+    display_text(impl, impl->message, 250 - strlen(impl->message) * 4, 244);
+  }
+
+  if (impl->front->scale != 1) {
+    SDL_SetRenderTarget(impl->renderer, NULL);
+    SDL_RenderCopy(impl->renderer, impl->prescaled_tex, NULL, NULL);
+  }
+
   SDL_RenderPresent(impl->renderer);
   SDL_RenderClear(impl->renderer);
 }
@@ -247,23 +323,19 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   }
 
   // Initialise front implementation struct
-  front_sdl_impl* impl = malloc(sizeof(front_sdl_impl));
+  front_sdl_impl* impl = calloc(1, sizeof(front_sdl_impl));
   impl->mouse_x = -1;
   impl->mouse_y = -1;
   impl->mouse_down = false;
 
   // Initialise palette
   for (int i = 0; i < 16 * 4; i++) {
-    impl->palette[i] = 0xFF000000 | ((uint32_t*)ui->pixels)[(i % 16) * 8 + (i / 16) * ui->w * 8];
+    impl->palette[i] = 0xFF000000 | ((uint32_t*)ui->pixels)[(i % 16) + (i / 16) * ui->w * 8];
   }
 
   // Create window
-  uint32_t width = 256;
-  //region_screen_width(front->sys->region) * front->scale;
-  uint32_t height = 256;
-  //region_screen_height(front->sys->region) * front->scale;
   impl->window = SDL_CreateWindow("pines", SDL_WINDOWPOS_CENTERED,
-                                  SDL_WINDOWPOS_CENTERED, width, height,
+                                  SDL_WINDOWPOS_CENTERED, 256, 256,
                                   SDL_WINDOW_OPENGL);
   if (!impl->window) {
     fprintf(stderr, "Could not create window\n");
@@ -307,21 +379,36 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
     return NULL;
   }
 
-  // Fill screen with black
-  SDL_SetRenderDrawColor(impl->renderer, 0, 0, 0, 255);
-  SDL_RenderClear(impl->renderer);
+  // Create surface for main screen
+  impl->prescaled_tex = SDL_CreateTexture(impl->renderer, SDL_PIXELFORMAT_ARGB8888,
+                                          SDL_TEXTUREACCESS_TARGET, 256, 256);
+  if (!impl->prescaled_tex) {
+    fprintf(stderr, "Could not create scaling texture\n");
+    SDL_DestroyTexture(impl->screen_tex);
+    SDL_DestroyTexture(impl->ui);
+    SDL_DestroyRenderer(impl->renderer);
+    SDL_DestroyWindow(impl->window);
+    free(impl);
+    return NULL;
+  }
 
   impl->front = front;
+  preflip(impl);
+
+  display_message(impl, "pines emulator initialised");
+
   return impl;
 }
 
 void front_sdl_impl_run(front_sdl_impl* impl) {
   bool running = true;
+  bool force_flip = false;
   uint32_t last_tick = SDL_GetTicks();
   sys* sys = impl->front->sys;
 
   // Enter render loop, waiting for user to quit
   while (running) {
+    // Process SDL events
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
       switch (event.type) {
@@ -333,8 +420,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
           controller_sdl_button(event);
           break;
         case SDL_MOUSEMOTION:
-          impl->mouse_x = event.motion.x;
-          impl->mouse_y = event.motion.y;
+          impl->mouse_x = event.motion.x / impl->front->scale;
+          impl->mouse_y = event.motion.y / impl->front->scale;
           break;
         case SDL_MOUSEBUTTONDOWN:
           impl->mouse_down = true;
@@ -347,13 +434,32 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
             switch (but_sel) {
               case BUTTON_LOAD: {
                 char* path = front_rom_dialog();
+                // The dialog stalls SDL, don't count ticks
+                last_tick = SDL_GetTicks();
                 if (path != NULL) {
                   sys_rom(sys, path);
                   free(path);
+                  switch (sys->status) {
+                    case SS_ROM_DAMAGED:
+                      display_message(impl, "Invalid ROM file!");
+                      break;
+                    case SS_ROM_MAPPER:
+                      display_message(impl, "Unsupported ROM mapper!");
+                      break;
+                    default:
+                      break;
+                  }
                 }
               } break;
               case BUTTON_START:
                 sys_start(sys);
+                switch (sys->status) {
+                  case SS_ROM_MISSING:
+                    display_message(impl, "No ROM loaded!");
+                    break;
+                  default:
+                    break;
+                }
                 break;
               case BUTTON_STOP:
                 sys_stop(sys);
@@ -379,21 +485,60 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
               case BUTTON_TEST:
                 sys_test(sys);
                 break;
+              case BUTTON_ZOOM: {
+                uint8_t scale = impl->front->scale;
+                switch (scale) {
+                  case 1: scale = 2; break;
+                  case 2: scale = 3; break;
+                  default: scale = 1; break;
+                }
+                SDL_SetWindowSize(impl->window, 256 * scale, 256 * scale);
+                impl->front->scale = scale;
+                force_flip = true;
+                display_message(impl, SCALE_FACTORS[scale - 1]);
+              } break;
             }
           }
           break;
       }
     }
+
+    // Calculate time passed
     uint32_t this_tick = SDL_GetTicks();
-    sys_run(sys, this_tick - last_tick);
+    uint32_t ticks_passed = this_tick - last_tick;
     last_tick = this_tick;
+
+    // Take away display message time, if any
+    if (impl->message_ticks) {
+      if (ticks_passed >= impl->message_ticks) {
+        impl->message_ticks = 0;
+      } else {
+        impl->message_ticks -= ticks_passed;
+      }
+    }
+
+    // Run the system for the time passed and display graphics
+    if (sys_run(sys, ticks_passed)) {
+      // The system crashed
+      switch (sys->status) {
+        case SS_CPU_TRAPPED:
+          display_message(impl, "CPU trap detected!");
+          break;
+        case SS_CPU_UNSUPPORTED_INSTRUCTION:
+          display_message(impl, "Unsupported instruction encountered!");
+          break;
+        default:
+          break;
+      }
+    }
     if (sys->running && (impl->front->tab == FT_SCREEN ||
                          impl->front->tab == FT_PPU ||
                          impl->front->tab == FT_IO)) {
       // If the system is running, flip on demand
-      if (sys->ppu->flip) {
+      if (sys->ppu->flip || force_flip) {
         uint32_t* pixels;
         uint32_t pitch;
+        preflip(impl);
         if (SDL_LockTexture(impl->screen_tex, NULL, (void**)&pixels, (void*)&pitch)) {
           //printf("err: %s\n", SDL_GetError());
         } else {
@@ -410,6 +555,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
       SDL_Delay(2);
     } else {
       // Otherwise flip on every 100ms
+      preflip(impl);
       flip(impl);
       SDL_Delay(100);
     }
