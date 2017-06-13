@@ -77,6 +77,7 @@ typedef struct {
   bool nmi_detected;
   bool nmi_pending;
   cpu_status status;
+  uint8_t last_opcode;
   uint32_t busy;
   interrupt_type last_interrupt;
 } cpu;

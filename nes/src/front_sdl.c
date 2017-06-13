@@ -42,6 +42,11 @@ static char* SCALE_FACTORS[] = {
   "Scale set to 3x",
 };
 
+static char* HEXADECIMAL = "0123456789ABCDEF";
+
+static char* UNSUPPORTED_INSTRUCTION_MESSAGE
+  = "0x00: Unsupported instruction encountered!";
+
 /**
  * Helper functions
  * 
@@ -173,6 +178,7 @@ static void flip(front_sdl_impl* impl) {
           rect.x = (i % 16) * 16;
           rect.y = (i / 16) * 8 + 240;
           SDL_RenderFillRect(impl->renderer, &rect);
+          display_number(impl, sys->ppu->palette[i] & 0x3F, rect.x + 6, rect.y - 3);
         }
       }
     } break;
@@ -533,7 +539,9 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
           display_message(impl, "CPU trap detected!");
           break;
         case SS_CPU_UNSUPPORTED_INSTRUCTION:
-          display_message(impl, "Unsupported instruction encountered!");
+          display_message(impl, UNSUPPORTED_INSTRUCTION_MESSAGE);
+          impl->message[2] = HEXADECIMAL[sys->cpu->last_opcode >> 4];
+          impl->message[3] = HEXADECIMAL[sys->cpu->last_opcode & 0xF];
           break;
         default:
           break;

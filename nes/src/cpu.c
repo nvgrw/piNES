@@ -184,6 +184,7 @@ bool cpu_cycle(cpu* cpu) {
     printf("!!! UNSUPPORTED INSTRUCTION !!!\n");
     dbg_print_state(cpu);
     cpu->status = CS_UNSUPPORTED_INSTRUCTION;
+    cpu->last_opcode = opcode;
     return true;
   }
   instr.implementation(cpu, address);
