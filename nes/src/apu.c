@@ -46,7 +46,7 @@ const uint8_t APU_DUTY_TABLE[] = {0x40, 0x60, 0x78, 0x9f};
 const uint16_t APU_NOISE_TABLE[] = {4,   8,   16,  32,  64,  96,   128,  160,
                                     202, 254, 380, 508, 762, 1016, 2034, 4068};
 
-apu* apu_init(void) { return calloc(1, sizeof(apu)); }
+apu_t* apu_init(void) { return calloc(1, sizeof(apu_t)); }
 
 /* ----- ENVELOPE ----- */
 static void apu_clock_specific_envelope(const apu_dve dve,
@@ -75,39 +75,35 @@ static void apu_clock_specific_envelope(const apu_dve dve,
   }
 }
 
-static void apu_clock_envelope(apu* apu) {
+static void apu_clock_envelope(apu_t* apu) {
   // Update envelopes
   {
     apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1, false)};
     apu_clock_specific_envelope(dve, &apu->pulse1_envelope);
   }
-  {
-    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG1, false)};
-    apu_clock_specific_envelope(dve, &apu->pulse2_envelope);
-  }
-  {
-    apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG1, false)};
-    apu_clock_specific_envelope(dve, &apu->noise_envelope);
-  }
+  // {
+  //   apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, PULSE2_REG1, false)};
+  //   apu_clock_specific_envelope(dve, &apu->pulse2_envelope);
+  // }
+  // {
+  //   apu_dve dve = {.raw = mmap_cpu_read(apu->mapper, NOISE_REG1, false)};
+  //   apu_clock_specific_envelope(dve, &apu->noise_envelope);
+  // }
 }
 
 /* ----- SWEEP ----- */
-static void apu_clock_specific_sweep(apu* apu, const register_4001_4005 flags,
+static void apu_clock_specific_sweep(apu_t* apu, const register_4001_4005 flags,
                                      apu_unit_sweep* unit, uint16_t reg3,
                                      uint16_t reg4) {
-  if (!flags.data.enabled) {
-    return;  // ??
-  }
-
   register_4002_4006 par_b = {.raw = mmap_cpu_read(apu->mapper, reg3, false)};
   apu_lclt par_c = {.raw = mmap_cpu_read(apu->mapper, reg4, false)};
   uint16_t raw_period = (((uint16_t)par_c.data_period.timer_high) << 8) |
                         (uint16_t)par_b.data.timer_low;
 
-  if (!flags.data.enabled) {
-    unit->last_period = raw_period;
-    return;
-  }
+  // if (!flags.data.enabled) {
+  //   unit->last_period = raw_period;
+  //   return;
+  // }
 
   uint16_t target_period = raw_period >> flags.data.shift_count;
   if (!flags.data.negate) {
@@ -117,7 +113,7 @@ static void apu_clock_specific_sweep(apu* apu, const register_4001_4005 flags,
   }
 
   if (unit->reload) {
-    if (unit->divider == 0) {
+    if (unit->divider == 0 && flags.data.enabled) {
       unit->last_period = target_period;
     }
     unit->divider = flags.data.period;
@@ -125,7 +121,7 @@ static void apu_clock_specific_sweep(apu* apu, const register_4001_4005 flags,
   } else {
     if (unit->divider != 0) {
       unit->divider--;
-    } else {
+    } else if (flags.data.enabled) {
       unit->divider = flags.data.period;
       unit->last_period = target_period;
     }
@@ -133,8 +129,8 @@ static void apu_clock_specific_sweep(apu* apu, const register_4001_4005 flags,
 }
 
 /* ----- PULSE CALCULATION ----- */
-static void apu_pulse1_calculate(apu* apu) {
-  // apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1, false)};
+static void apu_pulse1_calculate(apu_t* apu) {
+  apu_dve par_a = {.raw = mmap_cpu_read(apu->mapper, PULSE1_REG1, false)};
   // register_4002_4006 par_b = {.raw = mmap_cpu_read(apu->mapper,
   // PULSE1_REG3, false)}; apu_lclt par_c = {.raw = mmap_cpu_read(apu->mapper,
   // PULSE1_REG4, false)};
@@ -147,10 +143,28 @@ static void apu_pulse1_calculate(apu* apu) {
     // Either use sweep unit period or raw period, depending on mute settings.
     // apu->pulse1_channel.sequence_counter = raw_period;
     apu->pulse1_channel.sequence_counter = apu->pulse1_sweep.last_period;
+    apu->pulse1_channel.initial_sequence_counter =
+        apu->pulse1_sweep.last_period;
+  } else {
+    apu->pulse1_channel.sequence_counter--;
   }
   // TODO: Implement duty cycle sequences
   // & pulse 2
-  apu->last_pulse1 = apu->pulse1_envelope.last_value;
+
+  const double b = apu->pulse1_channel.initial_sequence_counter;
+  if (b < 0.001) {
+    apu->last_pulse1 = 0;
+    return;
+  }
+
+  const double a = apu->pulse1_channel.sequence_counter;
+  const uint8_t progress = ~(uint8_t)(8 * a / b) & 0x7;
+
+  if ((APU_DUTY_TABLE[par_a.data_period.duty_cycle] & (1 << progress)) != 0) {
+    apu->last_pulse1 = apu->pulse1_envelope.last_value;
+  } else {
+    apu->last_pulse1 = 0;
+  }
 }
 
 // static void apu_pulse2_calculate(apu* apu) {}
@@ -161,25 +175,45 @@ static void apu_pulse1_calculate(apu* apu) {
 
 // static void apu_dmc_calculate(apu* apuc) {}
 
-static uint8_t apu_pulses_output(apu* apu) {
-  // This formula is a linear approximation
-  return 0.00752 * (apu->last_pulse1 + apu->last_pulse2);
+// static uint8_t apu_pulses_output(apu* apu) {
+//   // This formula is a linear approximation
+//   return 0.00752 * (apu->last_pulse1 + apu->last_pulse2);
+// }
+
+// static uint8_t apu_tnd_output(apu* apu) {
+//   return 0.00851 * apu->last_triangle + 0.00494 * apu->last_noise +
+//          0.00335 * apu->last_dmc;
+// }
+
+void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
+  if (PULSE1_REG4 == address) {
+    apu->pulse1_envelope.start_flag = true;
+  }
+
+  if (PULSE2_REG4 == address) {
+    apu->pulse2_envelope.start_flag = true;
+  }
+
+  if (NOISE_REG3 == address) {
+    apu->noise_envelope.start_flag = true;
+  }
+
+  if (PULSE1_REG2 == address) {
+    apu->pulse1_sweep.reload = true;
+  }
+
+  if (PULSE2_REG2 == address) {
+    apu->pulse2_sweep.reload = true;
+  }
 }
 
-static uint8_t apu_tnd_output(apu* apu) {
-  return 0.00851 * apu->last_triangle + 0.00494 * apu->last_noise +
-         0.00335 * apu->last_dmc;
-}
-
-void apu_mem_write(apu* apu, uint16_t address, uint8_t val) {}
-
-static void apu_write_to_buffer(apu* apu, uint8_t value) {
+static void apu_write_to_buffer(apu_t* apu, uint8_t value) {
   apu->buffer[apu->buffer_cursor] = value;
   apu->buffer_cursor++;
   apu->buffer_cursor = apu->buffer_cursor % AUDIO_BUFFER_SIZE;
 }
 
-static void apu_sequencer_cycle(apu* apu) {
+static void apu_sequencer_cycle(apu_t* apu) {
   // Frame counter (drives envelope)
   register_4017_frame_counter fc = {
       .raw = mmap_cpu_read(apu->mapper, FRAME_COUNTER, false)};
@@ -188,15 +222,14 @@ static void apu_sequencer_cycle(apu* apu) {
   if (fc.data.mode == 0) {
     // Counter mode 0
     if (apu->sequencer_elapsed_apu_cycles >= 14915) {
-      apu_clock_envelope(apu);
       register_4001_4005 flags_pulse1 = {
           .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
                                PULSE1_REG3, PULSE1_REG4);
-      register_4001_4005 flags_pulse2 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
-      apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
-                               PULSE2_REG3, PULSE2_REG4);
+      // register_4001_4005 flags_pulse2 = {
+      //     .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
+      // apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
+      //                          PULSE2_REG3, PULSE2_REG4);
       apu->sequencer_elapsed_apu_cycles = 0;
     } else if (apu->sequencer_elapsed_apu_cycles >= 14914) {
       if (!fc.data.irq_inhibit) {
@@ -218,10 +251,10 @@ static void apu_sequencer_cycle(apu* apu) {
           .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
                                PULSE1_REG3, PULSE1_REG4);
-      register_4001_4005 flags_pulse2 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
-      apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
-                               PULSE2_REG3, PULSE2_REG4);
+      // register_4001_4005 flags_pulse2 = {
+      //     .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
+      // apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
+      //                          PULSE2_REG3, PULSE2_REG4);
     } else if (apu->sequencer_elapsed_apu_cycles >= 3729) {
       apu_clock_envelope(apu);
     }
@@ -233,10 +266,10 @@ static void apu_sequencer_cycle(apu* apu) {
           .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
                                PULSE1_REG3, PULSE1_REG4);
-      register_4001_4005 flags_pulse2 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
-      apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
-                               PULSE2_REG3, PULSE2_REG4);
+      // register_4001_4005 flags_pulse2 = {
+      //     .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
+      // apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
+      //                          PULSE2_REG3, PULSE2_REG4);
       apu->sequencer_elapsed_apu_cycles = 0;
     } else if (apu->sequencer_elapsed_apu_cycles >= 14915) {
     } else if (apu->sequencer_elapsed_apu_cycles >= 11186) {
@@ -247,10 +280,10 @@ static void apu_sequencer_cycle(apu* apu) {
           .raw = mmap_cpu_read(apu->mapper, PULSE1_REG2, false)};
       apu_clock_specific_sweep(apu, flags_pulse1, &apu->pulse1_sweep,
                                PULSE1_REG3, PULSE1_REG4);
-      register_4001_4005 flags_pulse2 = {
-          .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
-      apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
-                               PULSE2_REG3, PULSE2_REG4);
+      // register_4001_4005 flags_pulse2 = {
+      //     .raw = mmap_cpu_read(apu->mapper, PULSE2_REG2, false)};
+      // apu_clock_specific_sweep(apu, flags_pulse2, &apu->pulse2_sweep,
+      //                          PULSE2_REG3, PULSE2_REG4);
     } else if (apu->sequencer_elapsed_apu_cycles >= 3729) {
       apu_clock_envelope(apu);
     }
@@ -259,7 +292,7 @@ static void apu_sequencer_cycle(apu* apu) {
   apu->sequencer_elapsed_apu_cycles += 2;
 }
 
-void apu_cycle(apu* apu, void* context,
+void apu_cycle(apu_t* apu, void* context,
                void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
   // This function is called at the rate of the PPU. Only do something useful
   // every 3 cycles.
@@ -278,9 +311,10 @@ void apu_cycle(apu* apu, void* context,
   apu->is_even_cycle = !apu->is_even_cycle;
 
   apu_pulse1_calculate(apu);
+  uint8_t val = apu->last_pulse1;
 
   // Create output
-  uint8_t val = apu_pulses_output(apu) + apu_tnd_output(apu);
+  // uint8_t val = apu_pulses_output(apu) + apu_tnd_output(apu);
 
   // Skip samples/ downsample
   if (apu->sample_skips <= 1.0) {

@@ -26,7 +26,7 @@ typedef struct {
   cpu* cpu;
   ppu* ppu;
   mapper* mapper;
-  apu* apu;
+  apu_t* apu;
   // controller* ctrl1;
   // controller* ctrl2;
   region region;

@@ -20,19 +20,19 @@ extern const uint16_t APU_NOISE_TABLE[];
 
 // Bitfields
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t divider_period : 4;
     uint8_t constant_volume_envelope : 1;
     uint8_t length_counter_halt : 1;
     uint8_t : 2;
   } data;  // Common data
-  struct {
+  struct __attribute__((packed)) {
     uint8_t divider_period : 4;
     uint8_t constant_volume_envelope : 1;
     uint8_t length_counter_halt : 1;
     uint8_t duty_cycle : 2;
   } data_period;
-  struct {
+  struct __attribute__((packed)) {
     uint8_t divider_period : 4;
     uint8_t constant_volume_envelope : 1;
     uint8_t length_counter_halt : 1;
@@ -42,7 +42,7 @@ typedef union {
 } apu_dve;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t shift_count : 3;
     uint8_t negate : 1;
     uint8_t period : 3;
@@ -52,22 +52,22 @@ typedef union {
 } register_4001_4005;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t timer_low : 8;
   } data;
   uint8_t raw;
 } register_4002_4006;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t : 3;
     uint8_t length_counter_load : 5;
   } data;
-  struct {
+  struct __attribute__((packed)) {
     uint8_t timer_high : 3;
     uint8_t length_counter_load : 5;
   } data_period;
-  struct {
+  struct __attribute__((packed)) {
     uint8_t : 3;
     uint8_t length_counter_load : 5;
   } data_noise;
@@ -75,7 +75,7 @@ typedef union {
 } apu_lclt;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t linear_counter_reload : 7;
     uint8_t control : 1;
   } data;
@@ -83,14 +83,14 @@ typedef union {
 } register_4008;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t timer_low : 8;
   } data;
   uint8_t raw;
 } register_400a;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t timer_high : 3;
     uint8_t length_counter_load;
   } data;
@@ -98,7 +98,7 @@ typedef union {
 } register_400b;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t period : 4;
     uint8_t : 3;
     uint8_t mode : 1;
@@ -107,7 +107,7 @@ typedef union {
 } register_400e;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t rate_index : 4;
     uint8_t : 2;
     uint8_t loop_flag : 1;
@@ -117,7 +117,7 @@ typedef union {
 } register_4010;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t direct_load : 7;
     uint8_t : 1;
   } data;
@@ -125,21 +125,21 @@ typedef union {
 } register_4011;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t sample_address : 8;
   } data;
   uint8_t raw;
 } register_4012;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t sample_length : 8;
   } data;
   uint8_t raw;
 } register_4013;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t enable_pulse1 : 1;
     uint8_t enable_pulse2 : 1;
     uint8_t enable_triangle : 1;
@@ -153,7 +153,7 @@ typedef union {
 } register_4015_status;
 
 typedef union {
-  struct {
+  struct __attribute__((packed)) {
     uint8_t : 6;
     uint8_t irq_inhibit : 1;
     uint8_t mode : 1;
@@ -174,7 +174,10 @@ typedef struct {
   uint16_t last_period;
 } apu_unit_sweep;
 
-typedef struct { uint16_t sequence_counter; } apu_pulse_channel;
+typedef struct {
+  uint16_t sequence_counter;
+  uint16_t initial_sequence_counter;
+} apu_pulse_channel;
 
 typedef struct {
   mapper* mapper;
@@ -205,21 +208,21 @@ typedef struct {
   bool is_even_cycle;
 
   uint8_t last_pulse1, last_pulse2, last_triangle, last_noise, last_dmc;
-} apu;
+} apu_t;
 
 /**
  * Initialise the APU struct, setting all fields
  * to their default values
  */
-apu* apu_init(void);
+apu_t* apu_init(void);
 
 /**
  * Memory acces utility functions
  */
-void apu_mem_write(apu* apu, uint16_t address, uint8_t val);
+void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val);
 
 /**
  * General output methods
  */
-void apu_cycle(apu* apu, void* context,
+void apu_cycle(apu_t* apu, void* context,
                void (*enqueue_audio)(void* context, uint8_t* buffer, int len));
