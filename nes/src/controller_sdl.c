@@ -2,6 +2,7 @@
 
 #include "controller.h"
 #include "controller_sdl.h"
+#include "error.h"
 
 /**
  * controller_sdl.c
@@ -52,7 +53,7 @@ int controller_sdl_init(void) {
   ctrl2_state.down = 0;
   ctrl2_state.left = 0;
   ctrl2_state.right = 0;
-  return EXIT_SUCCESS;
+  return EC_SUCCESS;
 }
 
 void controller_sdl_poll(controller_t* ctrl) {

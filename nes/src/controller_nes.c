@@ -7,6 +7,7 @@
 
 #include "controller.h"
 #include "controller_nes.h"
+#include "error.h"
 
 /**
  * controller_nes.c
