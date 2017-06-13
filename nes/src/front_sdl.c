@@ -250,6 +250,7 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   front_sdl_impl* impl = malloc(sizeof(front_sdl_impl));
   impl->mouse_x = -1;
   impl->mouse_y = -1;
+  impl->mouse_down = false;
 
   // Initialise palette
   for (int i = 0; i < 16 * 4; i++) {
