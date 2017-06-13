@@ -19,4 +19,6 @@ uint32_t region_screen_height(region region) {
     case R_DENDY:
       return 239;
   }
+  // Control reaches end of function
+  return 0;
 }
