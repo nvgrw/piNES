@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "apu.h"
+#include "controller.h"
 #include "cpu.h"
 #include "ppu.h"
 #include "sys.h"
@@ -16,11 +18,15 @@ sys* sys_init(void) {
   ret->cpu = cpu_init();
   ret->ppu = ppu_init();
   ret->apu = apu_init();
+  ret->controller = controller_init();
   ret->mapper = NULL;
 
   ret->region = R_NTSC;
   ret->status = SS_NONE;
   ret->running = false;
+  for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
+    (*CONTROLLER_DRIVERS[i].init)();
+  }
   return ret;
 }
 
@@ -30,7 +36,7 @@ sys* sys_init(void) {
 #define PPU_CYCLES_PER_SECOND (CLOCKS_PER_SECOND / 4.0)
 #define CLOCK_PERIOD (4.0 / CLOCKS_PER_MILLISECOND)
 
-void sys_run(sys* sys, uint32_t ms, void* context,
+bool sys_run(sys* sys, uint32_t ms, void* context,
              void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
   if (sys->running) {
     sys->clock += ms;
@@ -38,7 +44,18 @@ void sys_run(sys* sys, uint32_t ms, void* context,
       cpu_nmi(sys->cpu, sys->ppu->nmi);
       if (cpu_cycle(sys->cpu)) {
         // Trapped, stop execution
+        switch (sys->cpu->status) {
+          case CS_TRAPPED:
+            sys->status = SS_CPU_TRAPPED;
+            break;
+          case CS_UNSUPPORTED_INSTRUCTION:
+            sys->status = SS_CPU_UNSUPPORTED_INSTRUCTION;
+            break;
+          default:
+            break;
+        }
         sys->running = false;
+        return true;
       }
 
       ppu_cycle(sys->ppu);
@@ -47,8 +64,18 @@ void sys_run(sys* sys, uint32_t ms, void* context,
 
       sys->clock -= CLOCK_PERIOD;
     }
+
+    if (sys->ppu->flip) {
+      controller_clear(sys->controller);
+      for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
+        (*CONTROLLER_DRIVERS[i].poll)(sys->controller);
+      }
+    }
   }
+  return false;
 }
+
+static void sys_reset(sys* sys) { cpu_reset(sys->cpu); }
 
 void sys_rom(sys* sys, char* path) {
   rom_error error = rom_load(&sys->mapper, path);
@@ -75,6 +102,8 @@ void sys_rom(sys* sys, char* path) {
     sys->mapper->cpu = sys->cpu;
     sys->mapper->ppu = sys->ppu;
     sys->mapper->apu = sys->apu;
+    sys->mapper->controller = sys->controller;
+    sys_reset(sys);
   }
 }
 
@@ -83,13 +112,12 @@ void sys_start(sys* sys) {
     sys->status = SS_ROM_MISSING;
     return;
   }
-  cpu_reset(sys->cpu);
   sys->running = true;
 }
 
 void sys_stop(sys* sys) {
   sys->running = false;
-  // also reset
+  sys_reset(sys);
 }
 
 void sys_pause(sys* sys) { sys->running = false; }
@@ -115,6 +143,10 @@ void sys_test(sys* sys) {
 }
 
 void sys_deinit(sys* sys) {
+  for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
+    (*CONTROLLER_DRIVERS[i].deinit)();
+  }
+  controller_deinit(sys->controller);
   ppu_deinit(sys->ppu);
   cpu_deinit(sys->cpu);
   free(sys);

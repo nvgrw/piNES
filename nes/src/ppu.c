@@ -11,10 +11,33 @@
 
 /**
  * Helper functions
- */
-
-/**
- * Reads the VRAM.
+ * 
+ * mmap
+ *   Reads the VRAM at the given address.
+ * 
+ * ppu_cycle_addr_nt
+ *   Sets the PPU address bus to a nametable entry.
+ * 
+ * ppu_cycle_fetch_nt
+ *   Reads a nametable entry.
+ * 
+ * ppu_cycle_addr_at
+ *   Sets the PPU address bus to an attribute table entry.
+ * 
+ * ppu_cycle_fetch_at
+ *   Reads an attribute table entry.
+ * 
+ * ppu_cycle_bg_low
+ *   Reads the low byte of a BG tile.
+ * 
+ * ppu_cycle_bg_high
+ *   Reads the high byte of a BG tile.
+ * 
+ * ppu_cycle_tile
+ *   Combines attributes, low and high bytes of tile.
+ * 
+ * ppu_fetch_sprite
+ *   Fetches and decodes a sprite from the OAM.
  */
 static uint32_t mmap(ppu* ppu, uint32_t address) {
   address &= 0x3FFF;
@@ -28,31 +51,19 @@ static uint32_t mmap(ppu* ppu, uint32_t address) {
   return mmap_ppu_read(ppu->mapper, address);
 }
 
-/**
- * Sets the PPU address bus to a nametable entry.
- */
 static void ppu_cycle_addr_nt(ppu* ppu) {
   ppu->io_addr = 0x2000 + ppu->v.nametable.addr;
 }
 
-/**
- * Reads a nametable entry.
- */
 static void ppu_cycle_fetch_nt(ppu* ppu, bool garbage) {
   ppu->ren_nt = mmap(ppu, ppu->io_addr);
 }
 
-/**
- * Sets the PPU address bus to an attribute table entry.
- */
 static void ppu_cycle_addr_at(ppu* ppu) {
   uint16_t v = ppu->v.raw;
   ppu->io_addr = 0x23C0 | (v & 0x0C00) | ((v >> 4) & 0x38) | ((v >> 2) & 0x07);
 }
 
-/**
- * Reads an attribute table entry.
- */
 static void ppu_cycle_fetch_at(ppu* ppu, bool garbage) {
   uint16_t v = ppu->v.raw;
   uint8_t shift = ((v >> 4) & 4) | (v & 2);
@@ -62,9 +73,6 @@ static void ppu_cycle_fetch_at(ppu* ppu, bool garbage) {
   }
 }
 
-/**
- * Reads the low byte of a BG tile.
- */
 static void ppu_cycle_bg_low(ppu* ppu) {
   ppu->io_addr = 0x1000 * (uint16_t)(ppu->ctrl.flags.bg_table) + 
                  16 * (uint16_t)(ppu->ren_nt) +
@@ -72,9 +80,6 @@ static void ppu_cycle_bg_low(ppu* ppu) {
   ppu->ren_bg_low = mmap(ppu, ppu->io_addr);
 }
 
-/**
- * Reads the high byte of a BG tile.
- */
 static void ppu_cycle_bg_high(ppu* ppu) {
   ppu->io_addr = 0x1000 * (uint16_t)(ppu->ctrl.flags.bg_table) + 
                  16 * (uint16_t)(ppu->ren_nt) +
@@ -82,9 +87,6 @@ static void ppu_cycle_bg_high(ppu* ppu) {
   ppu->ren_bg_high = mmap(ppu, ppu->io_addr + 8);
 }
 
-/**
- * Combines attributes, low and high bytes of tile.
- */
 static void ppu_cycle_tile(ppu* ppu) {
   uint32_t data = 0;
   for (uint8_t i = 0; i < 8; i++) {
@@ -151,7 +153,6 @@ static uint32_t ppu_fetch_sprite(ppu* ppu, uint8_t i, uint16_t row) {
  * 
  * See ppu.h for descriptions.
  */
-
 void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value) {
   if (address == PPU_ADDR_OAMDMA) {
     uint8_t buf[256];
@@ -162,7 +163,6 @@ void ppu_mem_write(ppu* ppu, uint16_t address, uint8_t value) {
     }
     return;
   }
-
 
   address &= 0x3FFF;
   address -= 0x2000;
@@ -283,15 +283,9 @@ void ppu_reset(ppu* ppu) {
   ppu->oam_data_ff = false;
 
   // Reset OAM
-  for (uint8_t i = 0; i < 64; i++) {
-    ppu->oam.raw32[i] = 0xFFFFFFFF;
+  for (uint16_t i = 0; i < 256; i++) {
+    ppu->oam.raw[i] = 0xFF;
   }
-  /*
-  for (uint8_t i = 0; i < 8; i++) {
-    ppu->oam_secondary.raw32[i] = 0xFFFFFFFF;
-    ppu->oam_tertiary.raw32[i] = 0xFFFFFFFF;
-  }
-  */
 }
 
 void ppu_power(ppu* ppu) {

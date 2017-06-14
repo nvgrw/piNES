@@ -18,6 +18,15 @@
 #define STATUS_DEFAULT 0x20
 #define NUM_INSTRUCTIONS 0x100
 
+/**
+ * The CPU status code, used to indicate errors.
+ */
+typedef enum {
+  CS_NONE,
+  CS_TRAPPED,
+  CS_UNSUPPORTED_INSTRUCTION
+} cpu_status;
+
 typedef enum { INTRT_NONE, INTRT_IRQ, INTRT_NMI, INTRT_RESET } interrupt_type;
 
 /*
@@ -67,6 +76,8 @@ typedef struct {
   bool branch_taken;
   bool nmi_detected;
   bool nmi_pending;
+  cpu_status status;
+  uint8_t last_opcode;
   uint32_t busy;
   interrupt_type last_interrupt;
 } cpu;

@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "apu.h"
+#include "controller.h"
 #include "cpu.h"
 #include "mappers.h"
 #include "ppu.h"
@@ -284,6 +285,7 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
     mapper->mapped.registers[address - MC_REGISTERS_BASE] = val;
     apu_mem_write(mapper->apu, address, val);
+    controller_mem_write(mapper->controller, address, val);
   }
 
   return;
@@ -307,6 +309,11 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
     if (address == 0x4015) {  // APU status register
       return apu_mem_read(mapper->apu, address);
+    }
+
+    // TODO: Use constants from controller.c, joypad 1 & 2
+    if (address == 0x4016 || address == 0x4017) {
+      return controller_mem_read(mapper->controller, address);
     }
 
     return mapper->mapped.registers[address - MC_REGISTERS_BASE];

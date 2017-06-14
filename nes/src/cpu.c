@@ -32,6 +32,7 @@ void cpu_reset(cpu* cpu) {
   cpu->register_status.raw = STATUS_DEFAULT;
   cpu->stack_pointer = STACK_DEFAULT;
   cpu->last_interrupt = INTRT_NONE;
+  cpu->status = CS_NONE;
   cpu->busy = 7;
   cpu->nmi_detected = false;
   cpu->nmi_pending = false;
@@ -49,6 +50,8 @@ void perform_irq(cpu* cpu);
 void perform_nmi(cpu* cpu);
 
 bool cpu_cycle(cpu* cpu) {
+  cpu->status = CS_NONE;
+
   // Cycle only if not busy
   if (cpu->busy) {
     cpu->busy--;
@@ -180,6 +183,8 @@ bool cpu_cycle(cpu* cpu) {
   if (instr.implementation == NULL) {
     printf("!!! UNSUPPORTED INSTRUCTION !!!\n");
     dbg_print_state(cpu);
+    cpu->status = CS_UNSUPPORTED_INSTRUCTION;
+    cpu->last_opcode = opcode;
     return true;
   }
   instr.implementation(cpu, address);
@@ -190,6 +195,7 @@ bool cpu_cycle(cpu* cpu) {
   if (cpu->program_counter == last_program_counter) {
     printf("!!! CPU TRAPPED !!!\n");
     dbg_print_state(cpu);
+    cpu->status = CS_TRAPPED;
     return true;
   }
 

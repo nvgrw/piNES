@@ -22,11 +22,13 @@ MOD_LDFLAGS = $(SDL_LDFLAGS) $(SDL_IMAGE_LDFLAGS) $(NFD_LDFLAGS) -framework AppK
 all: dir $(SPC_BUILD_DIR)/$(SPC_BINARY)
 
 # specific dependencies
-_SDEPS = cpu error front front_impl front_sdl mappers ppu region rom sys apu
+_SDEPS = controller controller_nes controller_sdl cpu error front \
+	front_impl front_sdl mappers ppu region rom sys
 SDEPS = $(patsubst %,$(SPC_INCLUDE_DIR)/%.h,$(_SDEPS))
 
 # specific object files
-_SOBJ = cpu front front_sdl mappers ppu region rom sys apu
+_SOBJ = controller controller_nes controller_sdl cpu front front_sdl mappers \
+	ppu region rom sys
 SOBJ = $(patsubst %,$(SPC_BUILD_DIR)/%.o,$(_SOBJ))
 
 $(SPC_BUILD_DIR)/%.o: $(SPC_SOURCE_DIR)/%.c $(SDEPS)

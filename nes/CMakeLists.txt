@@ -9,7 +9,7 @@ if(IS_PI)
   set (EXTRA_FLAGS "-DIS_PI")
 endif()
 
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -D_POSIX_SOURCE -D_BSD_SOURCE -D_THREAD_SAFE ${EXTRA_FLAGS} -std=c99 -Werror -pedantic")
+set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -D_THREAD_SAFE ${EXTRA_FLAGS} -std=c99 -Werror -pedantic")
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CMAKE_C_FLAGS}")
 
 file (GLOB SOURCES "src/*.c" "include/*.h")
@@ -23,10 +23,21 @@ if(APPLE)
   set (FRAMEWORKS "-framework Cocoa" "-framework AppKit" "-framework OpenGL")
 endif()
 
+if(UNIX AND NOT APPLE)
+  find_package(PkgConfig REQUIRED)
+  pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+  add_definitions(${GTK3_CFLAGS_OTHER})
+  link_directories(${GTK3_LIBRARY_DIRS})
+endif()
+
+if(IS_PI)
+  set (FRAMEWORKS ${FRAMEWORKS} pigpio)
+endif()
+
 include_directories (include ${SDL2_INCLUDE_DIRS} ${SDL2_IMAGE_INCLUDE_DIRS}
-  ${NFD_INCLUDE_ROOT} ${NFD_INCLUDE_ROOT}/include)
+  ${NFD_INCLUDE_ROOT} ${NFD_INCLUDE_ROOT}/include ${GTK3_INCLUDE_DIRS})
 
 add_subdirectory(cmake)
 
 add_executable(nes "${SOURCES}")
-target_link_libraries(nes ${SDL2_LIBRARY} ${SDL2_IMAGE_LIBRARIES} nfd ${FRAMEWORKS})
+target_link_libraries(nes ${SDL2_LIBRARY} ${SDL2_IMAGE_LIBRARIES} ${GTK3_LIBRARIES} nfd ${FRAMEWORKS})
