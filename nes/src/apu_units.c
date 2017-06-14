@@ -75,13 +75,12 @@ void apu_unit_length_counter_reload(apu_unit_length_counter_t* unit) {
 /* https://wiki.nesdev.com/w/index.php/APU_Length_Counter */
 void apu_unit_length_counter_onenable(apu_unit_length_counter_t* unit) {
   apu_unit_length_counter_reload(unit);
-  printf("Enable unit %p, length counter: %u\n", (void*)unit,
-         unit->length_counter);
+  printf("Enable length counter unit %p\n", (void*)unit);
 }
 
 void apu_unit_length_counter_ondisable(apu_unit_length_counter_t* unit) {
   unit->length_counter = 0;
-  printf("Disable unit %p\n", (void*)unit);
+  printf("Disable length counter unit %p\n", (void*)unit);
 }
 
 void apu_unit_length_counter_clock(apu_unit_length_counter_t* unit) {

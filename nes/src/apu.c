@@ -72,7 +72,9 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
           ((uint16_t)r.data_period.timer_high) << 8;
       apu->channel_pulse1.length_counter.c_length_counter_load =
           r.data_period.length_counter_load;
-      apu_unit_length_counter_reload(&apu->channel_pulse1.length_counter);
+      if (apu->previous_status.data.enable_pulse1) {
+        apu_unit_length_counter_reload(&apu->channel_pulse1.length_counter);
+      }
       // Sequencer restarted
       apu->channel_pulse1.current_sequence_position = 0;
       // Envelope restarted
@@ -108,7 +110,9 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
           ((uint16_t)r.data_period.timer_high) << 8;
       apu->channel_pulse2.length_counter.c_length_counter_load =
           r.data_period.length_counter_load;
-      apu_unit_length_counter_reload(&apu->channel_pulse2.length_counter);
+      if (apu->previous_status.data.enable_pulse2) {
+        apu_unit_length_counter_reload(&apu->channel_pulse2.length_counter);
+      }
       // Sequencer restarted
       apu->channel_pulse2.current_sequence_position = 0;
       // Envelope restarted
@@ -119,7 +123,7 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       apu->channel_triangle.length_counter.c_length_counter_hold =
           r.data.control;
       apu->channel_triangle.control_flag = r.data.control;
-      apu->channel_triangle.linear_counter_reload_flag =
+      apu->channel_triangle.c_linear_counter_reload =
           r.data.linear_counter_reload;
     } break;
     case 0x400A: {
@@ -134,7 +138,9 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
           ((uint16_t)r.data.timer_high) << 8;
       apu->channel_triangle.length_counter.c_length_counter_load =
           r.data.length_counter_load;
-      apu_unit_length_counter_reload(&apu->channel_triangle.length_counter);
+      if (apu->previous_status.data.enable_triangle) {
+        apu_unit_length_counter_reload(&apu->channel_triangle.length_counter);
+      }
       apu->channel_triangle.linear_counter_reload_flag = true;
     } break;
     case 0x400C: {
@@ -155,7 +161,9 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       AR(apu_register_4003_4007_t);
       apu->channel_noise.length_counter.c_length_counter_load =
           r.data_noise.length_counter_load;
-      apu_unit_length_counter_reload(&apu->channel_noise.length_counter);
+      if (apu->previous_status.data.enable_noise) {
+        apu_unit_length_counter_reload(&apu->channel_noise.length_counter);
+      }
       // Envelope restarted
       apu->channel_noise.envelope.start_flag = true;
     } break;
@@ -427,7 +435,6 @@ static uint8_t apu_mix(apu_t* apu) {
                                        &apu->channel_noise);
   uint8_t dmc_out =
       apu_output_dmc(apu->previous_status.data.enable_dmc, &apu->channel_dmc);
-
   double pulse_out = apu->lookup_pulse_table[pulse1_out + pulse2_out];
   double tnd_out =
       apu->lookup_tnd_table[3 * triangle_out + 2 * noise_out + dmc_out];
