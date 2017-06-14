@@ -292,6 +292,7 @@ static void apu_frame_counter_clock_half_frame(apu_t* apu) {
   apu_unit_length_counter_clock(&apu->channel_pulse1.length_counter);
   apu_unit_length_counter_clock(&apu->channel_pulse2.length_counter);
   apu_unit_length_counter_clock(&apu->channel_triangle.length_counter);
+  apu_unit_length_counter_clock(&apu->channel_noise.length_counter);
 
   apu_unit_sweep_clock(&apu->channel_pulse1.sweep, true);
   apu_unit_sweep_clock(&apu->channel_pulse2.sweep, false);
