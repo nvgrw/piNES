@@ -1,15 +1,15 @@
 #pragma once
 
-#include <stdbool.h>
 #include <SDL.h>
+#include <stdbool.h>
 
-#include "front_impl.h"
 #include "front.h"
+#include "front_impl.h"
 #include "ppu.h"
 
 /**
  * front_sdl.h
- * 
+ *
  * SDL front.
  */
 
@@ -26,6 +26,8 @@ typedef struct {
 
   // The palette, stored in ARGB8888 format
   uint32_t palette[64];
+
+  SDL_AudioDeviceID audio_device;
 
   // Mouse-related
   int32_t mouse_x;

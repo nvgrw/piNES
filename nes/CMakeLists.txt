@@ -40,4 +40,4 @@ include_directories (include ${SDL2_INCLUDE_DIRS} ${SDL2_IMAGE_INCLUDE_DIRS}
 add_subdirectory(cmake)
 
 add_executable(nes "${SOURCES}")
-target_link_libraries(nes ${SDL2_LIBRARY} ${SDL2_IMAGE_LIBRARIES} ${GTK3_LIBRARIES} nfd ${FRAMEWORKS})
+target_link_libraries(nes ${SDL2_LIBRARY} ${SDL2_IMAGE_LIBRARIES} nfd ${GTK3_LIBRARIES} ${FRAMEWORKS})

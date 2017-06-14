@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "apu.h"
 #include "controller.h"
 #include "cpu.h"
 #include "ppu.h"
@@ -17,9 +18,10 @@ sys* sys_init(void) {
   ret->clock = 0.0;
   ret->cpu = cpu_init();
   ret->ppu = ppu_init();
-  //ret->apu = apu_init();
+  ret->apu = apu_init();
   ret->controller = controller_init();
   ret->mapper = NULL;
+
   ret->region = R_NTSC;
   ret->status = SS_NONE;
   ret->running = false;
@@ -35,7 +37,8 @@ sys* sys_init(void) {
 #define PPU_CYCLES_PER_SECOND (CLOCKS_PER_SECOND / 4.0)
 #define CLOCK_PERIOD (4.0 / CLOCKS_PER_MILLISECOND)
 
-bool sys_run(sys* sys, uint32_t ms) {
+bool sys_run(sys* sys, uint32_t ms, void* context,
+             void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
   if (sys->running) {
     PROFILER_POINT(SYS_START)
 
@@ -61,7 +64,8 @@ bool sys_run(sys* sys, uint32_t ms) {
       PROFILER_POINT(SYS_CPU)
 
       ppu_cycle(sys->ppu);
-      // apu cycle
+
+      apu_cycle(sys->apu, context, enqueue_audio);
 
       PROFILER_POINT(SYS_PPU)
 
@@ -80,9 +84,7 @@ bool sys_run(sys* sys, uint32_t ms) {
   return false;
 }
 
-static void sys_reset(sys* sys) {
-  cpu_reset(sys->cpu);
-}
+static void sys_reset(sys* sys) { cpu_reset(sys->cpu); }
 
 void sys_rom(sys* sys, char* path) {
   rom_error error = rom_load(&sys->mapper, path);
@@ -105,9 +107,11 @@ void sys_rom(sys* sys, char* path) {
   if (sys->mapper != NULL) {
     sys->cpu->mapper = sys->mapper;
     sys->ppu->mapper = sys->mapper;
-    sys->mapper->controller = sys->controller;
+    sys->apu->mapper = sys->mapper;
     sys->mapper->cpu = sys->cpu;
     sys->mapper->ppu = sys->ppu;
+    sys->mapper->apu = sys->apu;
+    sys->mapper->controller = sys->controller;
     sys_reset(sys);
   }
 }
@@ -125,9 +129,7 @@ void sys_stop(sys* sys) {
   sys_reset(sys);
 }
 
-void sys_pause(sys* sys) {
-  sys->running = false;
-}
+void sys_pause(sys* sys) { sys->running = false; }
 
 void sys_step(sys* sys) {
   if (sys->mapper == NULL) {

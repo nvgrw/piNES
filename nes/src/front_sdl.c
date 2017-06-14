@@ -1,17 +1,17 @@
+#include <SDL.h>
+#include <SDL_image.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <SDL.h>
-#include <SDL_image.h>
 
 #include "controller_sdl.h"
 #include "error.h"
 #include "front.h"
 #include "front_sdl.h"
-#include "region.h"
 #include "ppu.h"
 #include "profiler.h"
+#include "region.h"
 #include "sys.h"
 
 /**
@@ -38,15 +38,13 @@
  * Messages displayed when the user changes the display scaling.
  */
 static char* SCALE_FACTORS[] = {
-  "Scale set to 1x",
-  "Scale set to 2x",
-  "Scale set to 3x",
+    "Scale set to 1x", "Scale set to 2x", "Scale set to 3x",
 };
 
 static char* HEXADECIMAL = "0123456789ABCDEF";
 
-static char* UNSUPPORTED_INSTRUCTION_MESSAGE
-  = "0x00: Unsupported instruction encountered!";
+static char* UNSUPPORTED_INSTRUCTION_MESSAGE =
+    "0x00: Unsupported instruction encountered!";
 
 static uint8_t PROFILER_COLOURS[] = {
     0xFF, 0x11, 0x11,
@@ -62,25 +60,26 @@ static uint8_t PROFILER_COLOURS[] = {
 
 /**
  * Helper functions
- * 
+ *
  * display_number
  *   Displays a number on the UI at the given location.
- * 
+ *
  * display_text
  *   Displays a string on the UI at the given location.
- * 
+ *
  * display_message
  *   Set the current display message to the given string, will display for
  *   2 seconds.
- * 
+ *
  * preflip
  *   Sets up the render target (in case of scaling) and clears the screen.
- * 
+ *
  * flip
  *   Updates the window with the current screen data, and draws any UI
  *   on top of the screen as necessary.
  */
-static void display_number(front_sdl_impl* impl, uint32_t num, uint16_t x, uint16_t y) {
+static void display_number(front_sdl_impl* impl, uint32_t num, uint16_t x,
+                           uint16_t y) {
   SDL_Rect src = {.x = 144, .y = 0, .w = 8, .h = 8};
   SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
   if (!num) {
@@ -102,7 +101,8 @@ static void display_number(front_sdl_impl* impl, uint32_t num, uint16_t x, uint1
   }
 }
 
-static void display_text(front_sdl_impl* impl, char* str, uint16_t x, uint16_t y) {
+static void display_text(front_sdl_impl* impl, char* str, uint16_t x,
+                         uint16_t y) {
   SDL_Rect src = {.x = 0, .y = 0, .w = 8, .h = 8};
   SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
   while (*str != 0) {
@@ -179,8 +179,8 @@ static void flip(front_sdl_impl* impl) {
         for (int i = 0; i < 64; i++) {
           rect.h = 4;
           uint32_t colour = impl->palette[i];
-          SDL_SetRenderDrawColor(impl->renderer, colour >> 16,
-                                 colour >> 8, colour, 0xFF);
+          SDL_SetRenderDrawColor(impl->renderer, colour >> 16, colour >> 8,
+                                 colour, 0xFF);
           rect.x = (i % 16) * 16;
           rect.y = (i / 16) * 4 + 240;
           SDL_RenderFillRect(impl->renderer, &rect);
@@ -188,12 +188,13 @@ static void flip(front_sdl_impl* impl) {
       } else {
         for (int i = 0; i < 32; i++) {
           uint32_t colour = impl->palette[sys->ppu->palette[i] & 0x3F];
-          SDL_SetRenderDrawColor(impl->renderer, colour >> 16,
-                                 colour >> 8, colour, 0xFF);
+          SDL_SetRenderDrawColor(impl->renderer, colour >> 16, colour >> 8,
+                                 colour, 0xFF);
           rect.x = (i % 16) * 16;
           rect.y = (i / 16) * 8 + 240;
           SDL_RenderFillRect(impl->renderer, &rect);
-          display_number(impl, sys->ppu->palette[i] & 0x3F, rect.x + 6, rect.y - 3);
+          display_number(impl, sys->ppu->palette[i] & 0x3F, rect.x + 6,
+                         rect.y - 3);
         }
       }
     } break;
@@ -211,22 +212,28 @@ static void flip(front_sdl_impl* impl) {
         if (i == 1) {
           pressed = sys->controller->pressed2;
         }
-#define BUTTON(SX, SY, SW, SH, BUT) \
-  if (BUT) { src.x = 104 + SX; src.y = 88 + SY; src.w = dest.w = SW; \
-    src.h = dest.h = SH; dest.x = i * 24 + SX; dest.y = 240 + SY; \
-    SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest); }
+#define BUTTON(SX, SY, SW, SH, BUT)                        \
+  if (BUT) {                                               \
+    src.x = 104 + SX;                                      \
+    src.y = 88 + SY;                                       \
+    src.w = dest.w = SW;                                   \
+    src.h = dest.h = SH;                                   \
+    dest.x = i * 24 + SX;                                  \
+    dest.y = 240 + SY;                                     \
+    SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest); \
+  }
         BUTTON(17, 6, 4, 4, pressed.a)
         BUTTON(12, 6, 4, 4, pressed.b)
         BUTTON(12, 2, 4, 3, pressed.select)
         BUTTON(17, 2, 4, 3, pressed.start)
-        BUTTON(5,  3, 3, 2, pressed.up)
-        BUTTON(5,  8, 3, 2, pressed.down)
-        BUTTON(3,  5, 2, 3, pressed.left)
-        BUTTON(8,  5, 2, 3, pressed.right)
+        BUTTON(5, 3, 3, 2, pressed.up)
+        BUTTON(5, 8, 3, 2, pressed.down)
+        BUTTON(3, 5, 2, 3, pressed.left)
+        BUTTON(8, 5, 2, 3, pressed.right)
 #undef BUTTON
       }
     } break;
-    case FT_MMC_CPU: // pass through
+    case FT_MMC_CPU:  // pass through
     case FT_MMC_PPU: {
       // Display the memory map
       if (mapper != NULL) {
@@ -234,11 +241,12 @@ static void flip(front_sdl_impl* impl) {
         uint32_t pitch;
         if (SDL_LockTexture(impl->screen_tex, NULL, (void**)&pixels,
                             (void*)&pitch)) {
-          //printf("err: %s\n", SDL_GetError());
+          // printf("err: %s\n", SDL_GetError());
         } else {
           if (impl->front->tab == FT_MMC_CPU) {
             for (uint32_t i = 0; i < 0x10000; i++) {
-              pixels[i] = 0xFF000000 | (mmap_cpu_read(mapper, i, true) * 0x10101);
+              pixels[i] =
+                  0xFF000000 | (mmap_cpu_read(mapper, i, true) * 0x10101);
               if (i == pc) {
                 pixels[i] = 0xFFFF0000;
               }
@@ -341,7 +349,7 @@ static void flip(front_sdl_impl* impl) {
 
 /**
  * Public functions
- * 
+ *
  * See front_sdl.h for descriptions.
  */
 front_sdl_impl* front_sdl_impl_init(front* front) {
@@ -379,9 +387,9 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   }
 
   // Create window
-  impl->window = SDL_CreateWindow("pines", SDL_WINDOWPOS_CENTERED,
-                                  SDL_WINDOWPOS_CENTERED, 256, 256,
-                                  SDL_WINDOW_OPENGL);
+  impl->window =
+      SDL_CreateWindow("pines", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+                       256, 256, SDL_WINDOW_OPENGL);
   if (!impl->window) {
     fprintf(stderr, "Could not create window\n");
     SDL_FreeSurface(ui);
@@ -390,9 +398,8 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   }
 
   // Create renderer
-  impl->renderer = SDL_CreateRenderer(impl->window, -1,
-                                      SDL_RENDERER_ACCELERATED |
-                                      SDL_RENDERER_TARGETTEXTURE);
+  impl->renderer = SDL_CreateRenderer(
+      impl->window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_TARGETTEXTURE);
   if (!impl->renderer) {
     fprintf(stderr, "Could not create renderer\n");
     SDL_FreeSurface(ui);
@@ -425,14 +432,32 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   }
 
   // Create surface for main screen
-  impl->prescaled_tex = SDL_CreateTexture(impl->renderer, SDL_PIXELFORMAT_ARGB8888,
-                                          SDL_TEXTUREACCESS_TARGET, 256, 256);
+  impl->prescaled_tex =
+      SDL_CreateTexture(impl->renderer, SDL_PIXELFORMAT_ARGB8888,
+                        SDL_TEXTUREACCESS_TARGET, 256, 256);
   if (!impl->prescaled_tex) {
     fprintf(stderr, "Could not create scaling texture\n");
     SDL_DestroyTexture(impl->screen_tex);
     SDL_DestroyTexture(impl->ui);
     SDL_DestroyRenderer(impl->renderer);
     SDL_DestroyWindow(impl->window);
+    free(impl);
+    return NULL;
+  }
+
+  // Initialise audio
+  SDL_AudioSpec audio_want, audio_have;
+  audio_want.freq = APU_ACTUAL_SAMPLE_RATE;
+  audio_want.format = AUDIO_U8;
+  audio_want.samples = 512;
+  audio_want.callback = NULL;
+  audio_want.channels = 1;
+  audio_want.userdata = impl;
+
+  if ((impl->audio_device = SDL_OpenAudioDevice(
+           NULL, 0, &audio_want, &audio_have, SDL_AUDIO_ALLOW_FORMAT_CHANGE)) ==
+      0) {
+    fprintf(stderr, "Could not create audio device\n");
     free(impl);
     return NULL;
   }
@@ -444,6 +469,8 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
 
   return impl;
 }
+
+void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len);
 
 void front_sdl_impl_run(front_sdl_impl* impl) {
   bool running = true;
@@ -462,7 +489,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
         case SDL_QUIT:
           running = false;
           break;
-        case SDL_KEYDOWN: // pass through
+        case SDL_KEYDOWN:  // pass through
         case SDL_KEYUP:
           controller_sdl_button(event);
           break;
@@ -535,9 +562,15 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
               case BUTTON_ZOOM: {
                 uint8_t scale = impl->front->scale;
                 switch (scale) {
-                  case 1: scale = 2; break;
-                  case 2: scale = 3; break;
-                  default: scale = 1; break;
+                  case 1:
+                    scale = 2;
+                    break;
+                  case 2:
+                    scale = 3;
+                    break;
+                  default:
+                    scale = 1;
+                    break;
                 }
                 SDL_SetWindowSize(impl->window, 256 * scale, 256 * scale);
                 impl->front->scale = scale;
@@ -569,7 +602,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
     PROFILER_POINT(TICKS)
 
     // Run the system for the time passed and display graphics
-    if (sys_run(sys, ticks_passed)) {
+    if (sys_run(sys, ticks_passed, impl, front_sdl_impl_audio_enqueue)) {
       // The system crashed
       switch (sys->status) {
         case SS_CPU_TRAPPED:
@@ -585,16 +618,17 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
       }
     }
 
-    if (sys->running && (impl->front->tab == FT_SCREEN ||
-                         impl->front->tab == FT_PPU ||
-                         impl->front->tab == FT_IO)) {
+    if (sys->running &&
+        (impl->front->tab == FT_SCREEN || impl->front->tab == FT_PPU ||
+         impl->front->tab == FT_IO)) {
       // If the system is running, flip on demand
       if (sys->ppu->flip || force_flip) {
         uint32_t* pixels;
         uint32_t pitch;
         preflip(impl);
-        if (SDL_LockTexture(impl->screen_tex, NULL, (void**)&pixels, (void*)&pitch)) {
-          //printf("err: %s\n", SDL_GetError());
+        if (SDL_LockTexture(impl->screen_tex, NULL, (void**)&pixels,
+                            (void*)&pitch)) {
+          // printf("err: %s\n", SDL_GetError());
         } else {
           for (int i = 0; i < PPU_SCREEN_SIZE; i++) {
             pixels[i] = impl->palette[sys->ppu->screen[i]];
@@ -614,6 +648,11 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
       SDL_Delay(100);
     }
   }
+}
+
+void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len) {
+  front_sdl_impl* impl = (front_sdl_impl*)context;
+  SDL_QueueAudio(impl->audio_device, buffer, len);
 }
 
 void front_sdl_impl_deinit(front_sdl_impl* impl) {
