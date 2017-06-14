@@ -153,12 +153,13 @@ typedef struct {
     uint8_t* ppu_pattable1;
     uint8_t* ppu_nametable0;
     uint8_t* ppu_nametable1;
-    //uint8_t* ppu_palettes;
+    // uint8_t* ppu_palettes;
   } mapped;
 
   void* controller;
   void* cpu;
   void* ppu;
+  void* apu;
 } mapper;
 
 /*

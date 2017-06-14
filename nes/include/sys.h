@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#include "apu.h"
 #include "controller.h"
 #include "cpu.h"
 #include "ppu.h"
@@ -10,7 +11,7 @@
 
 /**
  * sys.h
- * 
+ *
  * Structs defining the NES system as a whole.
  */
 
@@ -40,7 +41,7 @@ typedef struct {
   cpu* cpu;
   ppu* ppu;
   mapper* mapper;
-  // apu* apu;
+  apu_t* apu;
   region region;
 
   sys_status status;
@@ -56,7 +57,8 @@ sys* sys_init(void);
  * Advances the clock of the system by the given number of milliseconds.
  * Returns true if the system stopped for any reason.
  */
-bool sys_run(sys* sys, uint32_t ms);
+bool sys_run(sys* sys, uint32_t ms, void* context,
+             void (*enqueue_audio)(void* context, uint8_t* buffer, int len));
 
 /**
  * Loads a ROM with the given path.

@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "apu.h"
 #include "controller.h"
 #include "cpu.h"
 #include "mappers.h"
@@ -107,8 +108,8 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   // - iNES doesn't use bytes 10 - 15
   //   Although flags 10 is an unofficial extension
   rom_type type = ROMTYPE_ARCHAIC;
-  size_t prg_rom_size =
-      header->prg_rom | header->flags9.nes2.prg_rom_additional << 4;
+  size_t prg_rom_size = header->prg_rom | header->flags9.nes2.prg_rom_additional
+                                              << 4;
   if (header->flags7.data.ines_version == 2 &&
       prg_rom_size <= rom_size / 0x4000) {
     type = ROMTYPE_NES2;
@@ -165,7 +166,7 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   ret->mapped.ppu_pattable1 = ret->mapped.ppu_pattable0 + MC_PATTABLE_SIZE;
   ret->mapped.ppu_nametable0 = ret->memory->vram;
   ret->mapped.ppu_nametable1 = ret->mapped.ppu_nametable0 + MC_NAMETABLE_SIZE;
-  //ret->mapped.ppu_palettes = ret->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
+  // ret->mapped.ppu_palettes = ret->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
 
   if (rom_get_mapper_number(ret) != 0) {
     return RE_UNKNOWN_MAPPER;
@@ -276,16 +277,17 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
     mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE] = val;
     return;
   }
-  if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) || address == 0x4014) {
+  if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
+      address == 0x4014) {
     ppu_mem_write((ppu*)mapper->ppu, address, val);
     return;
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
+    mapper->mapped.registers[address - MC_REGISTERS_BASE] = val;
+    apu_mem_write(mapper->apu, address, val);
     controller_mem_write(mapper->controller, address, val);
-    return;
   }
 
-  mapper->mapped.prg_rom1[address % 0x4000] = val;
   return;
 
   if (address >= MC_SRAM_BASE && address < MC_SRAM_UPPER) {
@@ -305,7 +307,16 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
     return ppu_mem_read((ppu*)mapper->ppu, address, dummy);
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
-    return controller_mem_read(mapper->controller, address);
+    if (address == 0x4015) {  // APU status register
+      return apu_mem_read(mapper->apu, address);
+    }
+
+    // TODO: Use constants from controller.c, joypad 1 & 2
+    if (address == 0x4016 || address == 0x4017) {
+      return controller_mem_read(mapper->controller, address);
+    }
+
+    return mapper->mapped.registers[address - MC_REGISTERS_BASE];
   }
   return mapper->mapped.prg_rom1[address % 0x4000];
 
