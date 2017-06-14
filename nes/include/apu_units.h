@@ -51,6 +51,8 @@ typedef void (*apu_timer_clock_t)(apu_timer_context_t* context);
 void apu_unit_timer_clock(apu_unit_timer_t* unit, apu_timer_context_t* context,
                           apu_timer_clock_t on_clock);
 
+void apu_unit_length_counter_reload(apu_unit_length_counter_t* unit);
+
 void apu_unit_length_counter_onenable(apu_unit_length_counter_t* unit);
 void apu_unit_length_counter_ondisable(apu_unit_length_counter_t* unit);
 void apu_unit_length_counter_clock(apu_unit_length_counter_t* unit);

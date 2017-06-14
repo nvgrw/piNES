@@ -11,6 +11,9 @@
 #define APU_ACTUAL_SAMPLE_RATE 44100
 #define AUDIO_BUFFER_SIZE 256
 
+#define LU_PULSE_SIZE 31
+#define LU_TND_SIZE 203
+
 // Register bitfields
 typedef union {
   struct __attribute__((packed)) {
@@ -182,6 +185,9 @@ typedef struct apu {
     bool reset_queued;
     uint8_t reset_queue_divider;
   } frame_counter;
+
+  double lookup_pulse_table[LU_PULSE_SIZE];
+  double lookup_tnd_table[LU_TND_SIZE];
 } apu_t;
 
 /**

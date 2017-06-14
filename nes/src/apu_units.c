@@ -1,5 +1,7 @@
-#include "apu_units.h"
+#include <stdio.h>
 #include <stdlib.h>
+
+#include "apu_units.h"
 
 /* https://wiki.nesdev.com/w/index.php/APU_Envelope */
 void apu_unit_envelope_clock(apu_unit_envelope_t* unit) {
@@ -66,13 +68,20 @@ static const int LENGTH_COUNTER_LOAD_TABLE[] = {
     10, 254, 20, 2,  40, 4,  80, 6,  160, 8,  60, 10, 14, 12, 26, 14,
     12, 16,  24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30};
 
+void apu_unit_length_counter_reload(apu_unit_length_counter_t* unit) {
+  unit->length_counter = LENGTH_COUNTER_LOAD_TABLE[unit->c_length_counter_load];
+}
+
 /* https://wiki.nesdev.com/w/index.php/APU_Length_Counter */
 void apu_unit_length_counter_onenable(apu_unit_length_counter_t* unit) {
-  unit->length_counter = LENGTH_COUNTER_LOAD_TABLE[unit->c_length_counter_load];
+  apu_unit_length_counter_reload(unit);
+  printf("Enable unit %p, length counter: %u\n", (void*)unit,
+         unit->length_counter);
 }
 
 void apu_unit_length_counter_ondisable(apu_unit_length_counter_t* unit) {
   unit->length_counter = 0;
+  printf("Disable unit %p\n", (void*)unit);
 }
 
 void apu_unit_length_counter_clock(apu_unit_length_counter_t* unit) {

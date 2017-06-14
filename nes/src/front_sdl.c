@@ -493,6 +493,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
                 }
               } break;
               case BUTTON_START:
+                SDL_PauseAudioDevice(impl->audio_device, false);
                 sys_start(sys);
                 switch (sys->status) {
                   case SS_ROM_MISSING:
@@ -503,6 +504,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
                 }
                 break;
               case BUTTON_STOP:
+                SDL_PauseAudioDevice(impl->audio_device, true);
                 sys_stop(sys);
                 break;
               case BUTTON_PAUSE:
