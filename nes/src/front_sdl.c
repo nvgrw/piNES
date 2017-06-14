@@ -11,6 +11,7 @@
 #include "front_sdl.h"
 #include "region.h"
 #include "ppu.h"
+#include "profiler.h"
 #include "sys.h"
 
 /**
@@ -46,6 +47,18 @@ static char* HEXADECIMAL = "0123456789ABCDEF";
 
 static char* UNSUPPORTED_INSTRUCTION_MESSAGE
   = "0x00: Unsupported instruction encountered!";
+
+static uint8_t PROFILER_COLOURS[] = {
+    0xFF, 0x11, 0x11,
+    0xFF, 0xFF, 0x11,
+    0xAA, 0xAA, 0xAA,
+    0x11, 0xFF, 0x11,
+    0x11, 0xFF, 0xFF,
+    0x11, 0x11, 0xFF,
+    0xFF, 0xAA, 0xAA,
+    0xFF, 0x11, 0xFF,
+    0xAA, 0xFF, 0xFF,
+  };
 
 /**
  * Helper functions
@@ -130,6 +143,8 @@ static void preflip(front_sdl_impl* impl) {
   // Fill screen with black
   SDL_SetRenderDrawColor(impl->renderer, 0, 0, 0, 255);
   SDL_RenderClear(impl->renderer);
+
+  PROFILER_POINT(PREFLIP)
 }
 
 static void flip(front_sdl_impl* impl) {
@@ -299,6 +314,22 @@ static void flip(front_sdl_impl* impl) {
     display_text(impl, impl->message, 250 - strlen(impl->message) * 4, 244);
   }
 
+  PROFILER_POINT(END)
+
+  // Display profiler data
+  float* times = profiler_get_times();
+  dest.x = 0;
+  dest.y = 250;
+  dest.h = 6;
+  for (int i = 0; i < PROFILER_NUM_POINTS; i++) {
+    dest.w = times[i] * 256;
+    SDL_SetRenderDrawColor(impl->renderer, PROFILER_COLOURS[i * 3],
+                           PROFILER_COLOURS[i * 3 + 1],
+                           PROFILER_COLOURS[i * 3 + 2], 0xFF);
+    SDL_RenderFillRect(impl->renderer, &dest);
+    dest.x += dest.w;
+  }
+
   if (impl->front->scale != 1) {
     SDL_SetRenderTarget(impl->renderer, NULL);
     SDL_RenderCopy(impl->renderer, impl->prescaled_tex, NULL, NULL);
@@ -422,6 +453,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
 
   // Enter render loop, waiting for user to quit
   while (running) {
+    PROFILER_POINT(START)
+
     // Process SDL events
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
@@ -517,6 +550,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
       }
     }
 
+    PROFILER_POINT(EVENTS)
+
     // Calculate time passed
     uint32_t this_tick = SDL_GetTicks();
     uint32_t ticks_passed = this_tick - last_tick;
@@ -530,6 +565,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
         impl->message_ticks -= ticks_passed;
       }
     }
+
+    PROFILER_POINT(TICKS)
 
     // Run the system for the time passed and display graphics
     if (sys_run(sys, ticks_passed)) {
@@ -547,6 +584,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
           break;
       }
     }
+
     if (sys->running && (impl->front->tab == FT_SCREEN ||
                          impl->front->tab == FT_PPU ||
                          impl->front->tab == FT_IO)) {

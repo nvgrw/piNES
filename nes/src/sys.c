@@ -5,6 +5,7 @@
 #include "controller.h"
 #include "cpu.h"
 #include "ppu.h"
+#include "profiler.h"
 #include "sys.h"
 
 /**
@@ -36,8 +37,10 @@ sys* sys_init(void) {
 
 bool sys_run(sys* sys, uint32_t ms) {
   if (sys->running) {
+    PROFILER_POINT(SYS_START)
+
     sys->clock += ms;
-    while (sys->clock >= CLOCK_PERIOD && sys->running) {
+    while (sys->clock >= CLOCK_PERIOD) {
       cpu_nmi(sys->cpu, sys->ppu->nmi);
       if (cpu_cycle(sys->cpu)) {
         // Trapped, stop execution
@@ -55,11 +58,17 @@ bool sys_run(sys* sys, uint32_t ms) {
         return true;
       }
 
+      PROFILER_POINT(SYS_CPU)
+
       ppu_cycle(sys->ppu);
       // apu cycle
 
+      PROFILER_POINT(SYS_PPU)
+
       sys->clock -= CLOCK_PERIOD;
     }
+
+    PROFILER_POINT(SYS_END)
 
     if (sys->ppu->flip) {
       controller_clear(sys->controller);
