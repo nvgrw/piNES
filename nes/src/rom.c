@@ -305,6 +305,10 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
     return ppu_mem_read((ppu*)mapper->ppu, address, dummy);
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
+    if (address == 0x4015) {  // APU status register
+      return apu_mem_read(mapper->apu, address);
+    }
+
     return mapper->mapped.registers[address - MC_REGISTERS_BASE];
   }
   return mapper->mapped.prg_rom1[address % 0x4000];

@@ -1,4 +1,5 @@
 #include "apu_units.h"
+#include <stdlib.h>
 
 /* https://wiki.nesdev.com/w/index.php/APU_Envelope */
 void apu_unit_envelope_clock(apu_unit_envelope_t* unit) {
@@ -49,9 +50,13 @@ void apu_unit_sweep_clock(apu_unit_sweep_t* unit, bool ones_complement) {
 }
 
 /* https://wiki.nesdev.com/w/index.php/APU#Glossary */
-void apu_unit_timer_clock(apu_unit_timer_t* unit) {
+void apu_unit_timer_clock(apu_unit_timer_t* unit, apu_timer_context_t* context,
+                          apu_timer_clock_t on_clock) {
   if (unit->divider == 0) {
     unit->divider = unit->c_timer_period;
+    if (context != NULL && on_clock != NULL) {
+      on_clock(context);
+    }
   } else {
     unit->divider--;
   }

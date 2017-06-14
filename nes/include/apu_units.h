@@ -45,7 +45,11 @@ void apu_unit_envelope_clock(apu_unit_envelope_t* unit);
 void apu_unit_sweep_sweep(apu_unit_sweep_t* unit, bool ones_complement);
 void apu_unit_sweep_clock(apu_unit_sweep_t* unit, bool ones_complement);
 
-void apu_unit_timer_clock(apu_unit_timer_t* unit);
+typedef void apu_timer_context_t;
+typedef void (*apu_timer_clock_t)(apu_timer_context_t* context);
+
+void apu_unit_timer_clock(apu_unit_timer_t* unit, apu_timer_context_t* context,
+                          apu_timer_clock_t on_clock);
 
 void apu_unit_length_counter_onenable(apu_unit_length_counter_t* unit);
 void apu_unit_length_counter_ondisable(apu_unit_length_counter_t* unit);

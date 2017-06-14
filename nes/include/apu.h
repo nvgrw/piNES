@@ -143,7 +143,7 @@ typedef union {
     uint8_t dmc_interrupt : 1;
   } data;
   uint8_t raw;
-} apu_register_4015_status;
+} apu_register_4015_status_t;
 
 typedef union {
   struct __attribute__((packed)) {
@@ -170,6 +170,18 @@ typedef struct apu {
   apu_channel_triangle_t channel_triangle;
   apu_channel_noise_t channel_noise;
   apu_channel_dmc_t channel_dmc;
+
+  // Utility
+  apu_register_4015_status_t previous_status;
+  struct {
+    bool mode_flag;  // false = 4-step, true = 5-step
+    bool irq_inhibit_flag;
+    uint16_t cycles;
+    uint8_t cycle_index;
+
+    bool reset_queued;
+    uint8_t reset_queue_divider;
+  } frame_counter;
 } apu_t;
 
 /**
@@ -182,6 +194,7 @@ apu_t* apu_init(void);
  * Memory acces utility functions
  */
 void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val);
+uint8_t apu_mem_read(apu_t* apu, uint16_t address);
 
 /**
  * General output methods
