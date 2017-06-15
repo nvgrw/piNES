@@ -3,6 +3,7 @@
 #include <stdbool.h>
 
 #include "apu.h"
+#include "apu_typedefs.h"
 #include "controller.h"
 #include "cpu.h"
 #include "ppu.h"
@@ -38,8 +39,8 @@ typedef enum {
 typedef struct {
   double clock;
   controller_t* controller;
-  cpu* cpu;
-  ppu* ppu;
+  cpu_t* cpu;
+  ppu_t* ppu;
   mapper* mapper;
   apu_t* apu;
   region region;
@@ -58,7 +59,8 @@ sys* sys_init(void);
  * Returns true if the system stopped for any reason.
  */
 bool sys_run(sys* sys, uint32_t ms, void* context,
-             void (*enqueue_audio)(void* context, uint8_t* buffer, int len));
+             apu_enqueue_audio_t enqueue_audio,
+             apu_get_queue_size_t get_queue_size);
 
 /**
  * Loads a ROM with the given path.

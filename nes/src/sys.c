@@ -38,7 +38,8 @@ sys* sys_init(void) {
 #define CLOCK_PERIOD (4.0 / CLOCKS_PER_MILLISECOND)
 
 bool sys_run(sys* sys, uint32_t ms, void* context,
-             void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
+             apu_enqueue_audio_t enqueue_audio,
+             apu_get_queue_size_t get_queue_size) {
   if (sys->running) {
     PROFILER_POINT(SYS_START)
 
@@ -65,9 +66,11 @@ bool sys_run(sys* sys, uint32_t ms, void* context,
 
       ppu_cycle(sys->ppu);
 
-      apu_cycle(sys->apu, context, enqueue_audio);
+      PROFILER_POINT(SYS_PPU_LOGIC)
 
-      PROFILER_POINT(SYS_PPU)
+      apu_cycle(sys->apu, context, enqueue_audio, get_queue_size);
+
+      // PROFILER_POINT(SYS_APU)
 
       sys->clock -= CLOCK_PERIOD;
     }

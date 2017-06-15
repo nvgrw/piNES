@@ -46,17 +46,21 @@ static char* HEXADECIMAL = "0123456789ABCDEF";
 static char* UNSUPPORTED_INSTRUCTION_MESSAGE =
     "0x00: Unsupported instruction encountered!";
 
+#ifdef PROFILER
 static uint8_t PROFILER_COLOURS[] = {
-    0xFF, 0x11, 0x11,
-    0xFF, 0xFF, 0x11,
-    0xAA, 0xAA, 0xAA,
-    0x11, 0xFF, 0x11,
-    0x11, 0xFF, 0xFF,
-    0x11, 0x11, 0xFF,
-    0xFF, 0xAA, 0xAA,
-    0xFF, 0x11, 0xFF,
-    0xAA, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, // PROF_START - PROF_EVENTS
+    0xFF, 0xFF, 0xFF, // PROF_EVENTS - PROF_TICKS
+    0xFF, 0xFF, 0xFF, // PROF_TICKS - PROF_SYS_START
+    0xFF, 0x11, 0x11, // PROF_SYS_START - PROF_SYS_CPU
+    0x11, 0x11, 0x11, // PROF_SYS_CPU - PROF_SYS_PPU_BG
+    0x11, 0x11, 0xFF, // PROF_SYS_PPU_BG - PROF_SYS_PPU_SPRITES
+    0x11, 0xFF, 0x11, // PROF_SYS_PPU_SPRITES - PROF_SYS_PPU_LOGIC
+    0xFF, 0xFF, 0xFF, // PROF_SYS_PPU_LOGIC - PROF_SYS_APU
+    0xFF, 0xFF, 0xFF, // PROF_SYS_APU - PROF_SYS_END
+    0xFF, 0xFF, 0xFF, // PROF_SYS_END - PROF_PREFLIP
+    0xFF, 0xFF, 0xFF, // PROF_PREFLIP - PROF_END
   };
+#endif
 
 /**
  * Helper functions
@@ -157,7 +161,7 @@ static void flip(front_sdl_impl* impl) {
   switch (impl->front->tab) {
     case FT_PPU: {
       // PPU OAM data
-      ppu* ppu = sys->ppu;
+      ppu_t* ppu = sys->ppu;
       display_number(impl, ppu->spr_count_max, 240, 8);
       uint16_t spr_y = 16;
       for (int i = 0; i < 64 && spr_y < 256; i++) {
@@ -324,6 +328,7 @@ static void flip(front_sdl_impl* impl) {
 
   PROFILER_POINT(END)
 
+#ifdef PROFILER
   // Display profiler data
   float* times = profiler_get_times();
   dest.x = 0;
@@ -337,6 +342,7 @@ static void flip(front_sdl_impl* impl) {
     SDL_RenderFillRect(impl->renderer, &dest);
     dest.x += dest.w;
   }
+#endif
 
   if (impl->front->scale != 1) {
     SDL_SetRenderTarget(impl->renderer, NULL);
@@ -448,8 +454,8 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   // Initialise audio
   SDL_AudioSpec audio_want, audio_have;
   audio_want.freq = APU_ACTUAL_SAMPLE_RATE;
-  audio_want.format = AUDIO_U8;
-  audio_want.samples = 512;
+  audio_want.format = AUDIO_S8;
+  audio_want.samples = 256;
   audio_want.callback = NULL;
   audio_want.channels = 1;
   audio_want.userdata = impl;
@@ -457,7 +463,7 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   if ((impl->audio_device = SDL_OpenAudioDevice(
            NULL, 0, &audio_want, &audio_have, SDL_AUDIO_ALLOW_FORMAT_CHANGE)) ==
       0) {
-    fprintf(stderr, "Could not create audio device\n");
+    fprintf(stderr, "Could not create audio device, %s\n", SDL_GetError());
     free(impl);
     return NULL;
   }
@@ -470,7 +476,9 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   return impl;
 }
 
-void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len);
+static void front_sdl_impl_audio_enqueue(void* context, apu_buffer_t* buffer,
+                                         int len);
+static apu_queued_size_t front_sdl_impl_audio_get_queue_size(void* context);
 
 void front_sdl_impl_run(front_sdl_impl* impl) {
   bool running = true;
@@ -526,6 +534,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
                 }
               } break;
               case BUTTON_START:
+                SDL_PauseAudioDevice(impl->audio_device, false);
                 sys_start(sys);
                 switch (sys->status) {
                   case SS_ROM_MISSING:
@@ -536,6 +545,7 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
                 }
                 break;
               case BUTTON_STOP:
+                SDL_PauseAudioDevice(impl->audio_device, true);
                 sys_stop(sys);
                 break;
               case BUTTON_PAUSE:
@@ -602,7 +612,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
     PROFILER_POINT(TICKS)
 
     // Run the system for the time passed and display graphics
-    if (sys_run(sys, ticks_passed, impl, front_sdl_impl_audio_enqueue)) {
+    if (sys_run(sys, ticks_passed, impl, front_sdl_impl_audio_enqueue,
+                front_sdl_impl_audio_get_queue_size)) {
       // The system crashed
       switch (sys->status) {
         case SS_CPU_TRAPPED:
@@ -650,9 +661,15 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
   }
 }
 
-void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len) {
+static void front_sdl_impl_audio_enqueue(void* context, apu_buffer_t* buffer,
+                                         int len) {
   front_sdl_impl* impl = (front_sdl_impl*)context;
   SDL_QueueAudio(impl->audio_device, buffer, len);
+}
+
+static apu_queued_size_t front_sdl_impl_audio_get_queue_size(void* context) {
+  front_sdl_impl* impl = (front_sdl_impl*)context;
+  return SDL_GetQueuedAudioSize(impl->audio_device);
 }
 
 void front_sdl_impl_deinit(front_sdl_impl* impl) {

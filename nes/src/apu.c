@@ -15,10 +15,22 @@ apu_t* apu_init(void) {
       &apu->channel_pulse1.timer.c_timer_period;
   apu->channel_pulse2.sweep.c_timer_period =
       &apu->channel_pulse2.timer.c_timer_period;
+
+  // Calculate the mixer lookup tables
+  // Formulae from here:
+  // https://wiki.nesdev.com/w/index.php/APU_Mixer#Lookup_Table
+  for (int i = 0; i < LU_PULSE_SIZE; i++) {
+    apu->lookup_pulse_table[i] = 95.52 / (8128.0 / i + 100);
+  }
+
+  for (int i = 0; i < LU_TND_SIZE; i++) {
+    apu->lookup_tnd_table[i] = 163.67 / (24329.0 / i + 100);
+  }
+
   return apu;
 }
 
-#define AR(type) type r = {.raw = mmap_cpu_read(apu->mapper, address, false)}
+#define AR(type) type r = {.raw = val}
 
 // TODO: Move to region.h, these are NTSC-specific periods
 static const int TIMER_PERIODS[] = {4,   8,   16,  32,  64,  96,   128,  160,
@@ -38,6 +50,7 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
           r.data_period.constant_volume_envelope;
       apu->channel_pulse1.length_counter.c_length_counter_hold =
           r.data_period.length_counter_halt;
+      apu->channel_pulse1.envelope.start_flag = true;
     } break;
     case 0x4001: {
       AR(apu_register_4001_4005_t);
@@ -57,8 +70,11 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       apu->channel_pulse1.timer.c_timer_period &= 0xFF;
       apu->channel_pulse1.timer.c_timer_period |=
           ((uint16_t)r.data_period.timer_high) << 8;
-      apu->channel_pulse1.length_counter.c_length_counter_hold =
+      apu->channel_pulse1.length_counter.c_length_counter_load =
           r.data_period.length_counter_load;
+      if (apu->previous_status.data.enable_pulse1) {
+        apu_unit_length_counter_reload(&apu->channel_pulse1.length_counter);
+      }
       // Sequencer restarted
       apu->channel_pulse1.current_sequence_position = 0;
       // Envelope restarted
@@ -72,6 +88,7 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
           r.data_period.constant_volume_envelope;
       apu->channel_pulse2.length_counter.c_length_counter_hold =
           r.data_period.length_counter_halt;
+      apu->channel_pulse2.envelope.start_flag = true;
     } break;
     case 0x4005: {
       AR(apu_register_4001_4005_t);
@@ -91,8 +108,11 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       apu->channel_pulse2.timer.c_timer_period &= 0xFF;
       apu->channel_pulse2.timer.c_timer_period |=
           ((uint16_t)r.data_period.timer_high) << 8;
-      apu->channel_pulse2.length_counter.c_length_counter_hold =
+      apu->channel_pulse2.length_counter.c_length_counter_load =
           r.data_period.length_counter_load;
+      if (apu->previous_status.data.enable_pulse2) {
+        apu_unit_length_counter_reload(&apu->channel_pulse2.length_counter);
+      }
       // Sequencer restarted
       apu->channel_pulse2.current_sequence_position = 0;
       // Envelope restarted
@@ -103,7 +123,7 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       apu->channel_triangle.length_counter.c_length_counter_hold =
           r.data.control;
       apu->channel_triangle.control_flag = r.data.control;
-      apu->channel_triangle.linear_counter_reload_flag =
+      apu->channel_triangle.c_linear_counter_reload =
           r.data.linear_counter_reload;
     } break;
     case 0x400A: {
@@ -118,6 +138,9 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
           ((uint16_t)r.data.timer_high) << 8;
       apu->channel_triangle.length_counter.c_length_counter_load =
           r.data.length_counter_load;
+      if (apu->previous_status.data.enable_triangle) {
+        apu_unit_length_counter_reload(&apu->channel_triangle.length_counter);
+      }
       apu->channel_triangle.linear_counter_reload_flag = true;
     } break;
     case 0x400C: {
@@ -138,6 +161,9 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       AR(apu_register_4003_4007_t);
       apu->channel_noise.length_counter.c_length_counter_load =
           r.data_noise.length_counter_load;
+      if (apu->previous_status.data.enable_noise) {
+        apu_unit_length_counter_reload(&apu->channel_noise.length_counter);
+      }
       // Envelope restarted
       apu->channel_noise.envelope.start_flag = true;
     } break;
@@ -162,6 +188,23 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
 
       // DMC Interrupt cleared by write
       r.data.dmc_interrupt = 0;
+
+      // Reset length counters
+      if (!r.data.enable_pulse1) {
+        apu->channel_pulse1.length_counter.length_counter = 0;
+      }
+
+      if (!r.data.enable_pulse2) {
+        apu->channel_pulse2.length_counter.length_counter = 0;
+      }
+
+      if (!r.data.enable_noise) {
+        apu->channel_noise.length_counter.length_counter = 0;
+      }
+
+      if (!r.data.enable_triangle) {
+        apu->channel_triangle.length_counter.length_counter = 0;
+      }
 
       // Store the new status
       apu->previous_status.raw = r.raw;
@@ -249,6 +292,7 @@ static void apu_frame_counter_clock_half_frame(apu_t* apu) {
   apu_unit_length_counter_clock(&apu->channel_pulse1.length_counter);
   apu_unit_length_counter_clock(&apu->channel_pulse2.length_counter);
   apu_unit_length_counter_clock(&apu->channel_triangle.length_counter);
+  apu_unit_length_counter_clock(&apu->channel_noise.length_counter);
 
   apu_unit_sweep_clock(&apu->channel_pulse1.sweep, true);
   apu_unit_sweep_clock(&apu->channel_pulse2.sweep, false);
@@ -343,15 +387,70 @@ static void apu_frame_counter_clock(apu_t* apu) {
   }
 }
 
+// ----- OUTPUT -----
+static uint8_t apu_output_pulse(bool enabled, apu_channel_pulse_t* channel) {
+  if (!enabled) return 0;
+
+  if (channel->duty_cycle_value == 0) return 0;
+  // TODO: Sweep overflow may use current period (change sweep as well if this
+  //       is the case)
+  if ((*channel->sweep.c_timer_period) > 0x7FF) return 0;
+  if (channel->length_counter.length_counter == 0) return 0;
+  if (channel->timer.divider < 8) return 0;
+
+  return channel->envelope.decay_level_counter;
+}
+
+static uint8_t apu_output_noise(bool enabled, apu_channel_noise_t* channel) {
+  if (!enabled) return 0;
+
+  if ((channel->shift_register & 0x1) == 0x1) return 0;
+  if (channel->length_counter.length_counter == 0) return 0;
+
+  return channel->envelope.decay_level_counter;
+}
+
+static uint8_t apu_output_triangle(bool enabled,
+                                   apu_channel_triangle_t* channel) {
+  if (!enabled) return 0;
+
+  if (channel->linear_counter == 0) return 0;
+  if (channel->length_counter.length_counter == 0) return 0;
+
+  return channel->duty_cycle_value;
+}
+
+static uint8_t apu_output_dmc(bool enabled, apu_channel_dmc_t* channel) {
+  if (!enabled) return 0;
+  return 0;
+}
+
+static apu_buffer_t apu_mix(apu_t* apu) {
+  uint8_t pulse1_out = apu_output_pulse(apu->previous_status.data.enable_pulse1,
+                                        &apu->channel_pulse1);
+  uint8_t pulse2_out = apu_output_pulse(apu->previous_status.data.enable_pulse2,
+                                        &apu->channel_pulse2);
+  uint8_t triangle_out = apu_output_triangle(
+      apu->previous_status.data.enable_triangle, &apu->channel_triangle);
+  uint8_t noise_out = apu_output_noise(apu->previous_status.data.enable_noise,
+                                       &apu->channel_noise);
+  uint8_t dmc_out =
+      apu_output_dmc(apu->previous_status.data.enable_dmc, &apu->channel_dmc);
+  double pulse_out = apu->lookup_pulse_table[pulse1_out + pulse2_out];
+  double tnd_out =
+      apu->lookup_tnd_table[3 * triangle_out + 2 * noise_out + dmc_out];
+  return 255.0 * (pulse_out + tnd_out - 0.5);
+}
+
 // ----- REST -----
-static void apu_write_to_buffer(apu_t* apu, uint8_t value) {
+static void apu_write_to_buffer(apu_t* apu, apu_buffer_t value) {
   apu->buffer[apu->buffer_cursor] = value;
   apu->buffer_cursor++;
   apu->buffer_cursor = apu->buffer_cursor % AUDIO_BUFFER_SIZE;
 }
 
-void apu_cycle(apu_t* apu, void* context,
-               void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
+void apu_cycle(apu_t* apu, void* context, apu_enqueue_audio_t enqueue_audio,
+               apu_get_queue_size_t get_queue_size) {
   // This function is called at the rate of the PPU. Only do something useful
   // every 3 cycles.
 
@@ -369,14 +468,10 @@ void apu_cycle(apu_t* apu, void* context,
   // Frame counter
   apu_frame_counter_clock(apu);
 
-  uint8_t val = 0;
-
-  // Create output
-  // uint8_t val = apu_pulses_output(apu) + apu_tnd_output(apu);
-
   // Skip samples/ downsample
-  if (apu->sample_skips <= 1.0) {
-    apu_write_to_buffer(apu, val);
+  if (apu->sample_skips <= 0.0) {
+    apu_write_to_buffer(apu, apu_mix(apu));
+
     if (apu->buffer_cursor == 0) {
       enqueue_audio(context, apu->buffer, AUDIO_BUFFER_SIZE);
     }
