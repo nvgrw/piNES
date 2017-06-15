@@ -46,6 +46,7 @@ static char* HEXADECIMAL = "0123456789ABCDEF";
 static char* UNSUPPORTED_INSTRUCTION_MESSAGE =
     "0x00: Unsupported instruction encountered!";
 
+#ifdef PROFILER
 static uint8_t PROFILER_COLOURS[] = {
     0xFF, 0xFF, 0xFF, // PROF_START - PROF_EVENTS
     0xFF, 0xFF, 0xFF, // PROF_EVENTS - PROF_TICKS
@@ -59,6 +60,7 @@ static uint8_t PROFILER_COLOURS[] = {
     0xFF, 0xFF, 0xFF, // PROF_SYS_END - PROF_PREFLIP
     0xFF, 0xFF, 0xFF, // PROF_PREFLIP - PROF_END
   };
+#endif
 
 /**
  * Helper functions
@@ -326,6 +328,7 @@ static void flip(front_sdl_impl* impl) {
 
   PROFILER_POINT(END)
 
+#ifdef PROFILER
   // Display profiler data
   float* times = profiler_get_times();
   dest.x = 0;
@@ -339,6 +342,7 @@ static void flip(front_sdl_impl* impl) {
     SDL_RenderFillRect(impl->renderer, &dest);
     dest.x += dest.w;
   }
+#endif
 
   if (impl->front->scale != 1) {
     SDL_SetRenderTarget(impl->renderer, NULL);

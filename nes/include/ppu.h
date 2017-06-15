@@ -128,6 +128,9 @@ typedef struct {
   uint8_t ctrl_ppu_master;
   uint8_t ctrl_nmi;
 
+  uint8_t sprite_size;
+  uint8_t increment;
+
   // Register PPUMASK
   union {
     struct __attribute__((packed)) {
