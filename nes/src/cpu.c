@@ -15,7 +15,7 @@
 
 cpu* cpu_init() {
   cpu* ret = calloc(1, sizeof(cpu));
-  //ret->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
+  // ret->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
   return ret;
 }
 
@@ -42,7 +42,7 @@ void cpu_reset(cpu* cpu) {
 }
 
 void cpu_deinit(cpu* cpu) {
-  //free(cpu->memory);
+  // free(cpu->memory);
   free(cpu);
 }
 
@@ -152,11 +152,11 @@ bool cpu_cycle(cpu* cpu) {
       bytes_used = 2;
       break;
     case AM_ZERO_PAGE_INDIRECT_Y:
-      address = cpu_mem_read16_bug(
-                    cpu, cpu_mem_read8(cpu, cpu->program_counter + 1));
+      address =
+          cpu_mem_read16_bug(cpu, cpu_mem_read8(cpu, cpu->program_counter + 1));
       page_crossed = is_page_crossed(address, address + cpu->register_y);
       address += cpu->register_y;
-      
+
       bytes_used = 2;
       break;
     case AM_INDIRECT:
@@ -177,7 +177,6 @@ bool cpu_cycle(cpu* cpu) {
 #endif
 
   // Execute
-  uint16_t last_program_counter = cpu->program_counter;
   cpu->program_counter += bytes_used;
   cpu->branch_taken = false;
   if (instr.implementation == NULL) {
@@ -190,14 +189,6 @@ bool cpu_cycle(cpu* cpu) {
   instr.implementation(cpu, address);
 
   cpu->addressing_special = false;
-
-  // Trap detection
-  if (cpu->program_counter == last_program_counter) {
-    printf("!!! CPU TRAPPED !!!\n");
-    dbg_print_state(cpu);
-    cpu->status = CS_TRAPPED;
-    return true;
-  }
 
   cpu->busy += instr.cycles * 3;
   if (instr.cycle_cross && page_crossed) {
@@ -212,12 +203,12 @@ bool cpu_cycle(cpu* cpu) {
 /* Utilities */
 uint8_t cpu_mem_read8(cpu* cpu, uint16_t address) {
   return mmap_cpu_read(cpu->mapper, address, false);
-  //return cpu->memory[address];
+  // return cpu->memory[address];
 }
 
 void cpu_mem_write8(cpu* cpu, uint16_t address, uint8_t value) {
   mmap_cpu_write(cpu->mapper, address, value);
-  //cpu->memory[address] = value;
+  // cpu->memory[address] = value;
 }
 
 uint16_t cpu_mem_read16(cpu* cpu, uint16_t address) {
@@ -743,276 +734,281 @@ void cpu_impl_tya(cpu* cpu, uint16_t address) {
 }
 
 // Macros to define instructions
-#define I(A, B, C) \
-  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
-    .cycles = C, .cycle_cross = false, .cycle_branch = false },
-#define IB(A, B, C) \
-  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
-    .cycles = C, .cycle_cross = true, .cycle_branch = true },
-#define IC(A, B, C) \
-  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
-    .cycles = C, .cycle_cross = true, .cycle_branch = false },
+#define I(A, B, C)                                                   \
+  {                                                                  \
+    .mode = AM_##A, .mnemonic = #B, .implementation = &cpu_impl_##B, \
+    .cycles = C, .cycle_cross = false, .cycle_branch = false         \
+  }
+#define IB(A, B, C)                                                  \
+  {                                                                  \
+    .mode = AM_##A, .mnemonic = #B, .implementation = &cpu_impl_##B, \
+    .cycles = C, .cycle_cross = true, .cycle_branch = true           \
+  }
+#define IC(A, B, C)                                                  \
+  {                                                                  \
+    .mode = AM_##A, .mnemonic = #B, .implementation = &cpu_impl_##B, \
+    .cycles = C, .cycle_cross = true, .cycle_branch = false          \
+  }
 #define NI \
-  { .mode = AM_ACCUMULATOR, .mnemonic = "###", .implementation = NULL },
+  { .mode = AM_ACCUMULATOR, .mnemonic = "###", .implementation = NULL }
 
 const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS] = {
-    I(IMPLIED, brk, 7)
-    I(ZERO_PAGE_INDIRECT, ora, 6)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE, ora, 3)
-    I(ZERO_PAGE, asl, 5)
-    NI
-    I(IMPLIED, php, 3)
-    I(IMMEDIATE, ora, 2)
-    I(ACCUMULATOR, asl, 2)
-    NI
-    NI
-    I(ABSOLUTE, ora, 4)
-    I(ABSOLUTE, asl, 6)
-    NI
-    IB(RELATIVE, bpl, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, ora, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, ora, 4)
-    I(ZERO_PAGE_X, asl, 6)
-    NI
-    I(IMPLIED, clc, 2)
-    IC(ABSOLUTE_Y, ora, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, ora, 4)
-    I(ABSOLUTE_X, asl, 7)
-    NI
-    I(ABSOLUTE, jsr, 6)
-    I(ZERO_PAGE_INDIRECT, and, 6)
-    NI
-    NI
-    I(ZERO_PAGE, bit, 3)
-    I(ZERO_PAGE, and, 3)
-    I(ZERO_PAGE, rol, 5)
-    NI
-    I(IMPLIED, plp, 4)
-    I(IMMEDIATE, and, 2)
-    I(ACCUMULATOR, rol, 2)
-    NI
-    I(ABSOLUTE, bit, 4)
-    I(ABSOLUTE, and, 4)
-    I(ABSOLUTE, rol, 6)
-    NI
-    IB(RELATIVE, bmi, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, and, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, and, 4)
-    I(ZERO_PAGE_X, rol, 6)
-    NI
-    I(IMPLIED, sec, 2)
-    IC(ABSOLUTE_Y, and, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, and, 4)
-    I(ABSOLUTE_X, rol, 7)
-    NI
-    I(IMPLIED, rti, 6)
-    I(ZERO_PAGE_INDIRECT, eor, 6)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE, eor, 3)
-    I(ZERO_PAGE, lsr, 5)
-    NI
-    I(IMPLIED, pha, 3)
-    I(IMMEDIATE, eor, 2)
-    I(ACCUMULATOR, lsr, 2)
-    NI
-    I(ABSOLUTE, jmp, 3)
-    I(ABSOLUTE, eor, 4)
-    I(ABSOLUTE, lsr, 6)
-    NI
-    IB(RELATIVE, bvc, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, eor, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, eor, 4)
-    I(ZERO_PAGE_X, lsr, 6)
-    NI
-    I(IMPLIED, cli, 2)
-    IC(ABSOLUTE_Y, eor, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, eor, 4)
-    I(ABSOLUTE_X, lsr, 7)
-    NI
-    I(IMPLIED, rts, 6)
-    I(ZERO_PAGE_INDIRECT, adc, 6)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE, adc, 3)
-    I(ZERO_PAGE, ror, 5)
-    NI
-    I(IMPLIED, pla, 4)
-    I(IMMEDIATE, adc, 2)
-    I(ACCUMULATOR, ror, 2)
-    NI
-    I(INDIRECT, jmp, 5)
-    I(ABSOLUTE, adc, 4)
-    I(ABSOLUTE, ror, 6)
-    NI
-    IB(RELATIVE, bvs, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, adc, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, adc, 4)
-    I(ZERO_PAGE_X, ror, 6)
-    NI
-    I(IMPLIED, sei, 2)
-    IC(ABSOLUTE_Y, adc, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, adc, 4)
-    I(ABSOLUTE_X, ror, 7)
-    NI
-    NI
-    I(ZERO_PAGE_INDIRECT, sta, 6)
-    NI
-    NI
-    I(ZERO_PAGE, sty, 3)
-    I(ZERO_PAGE, sta, 3)
-    I(ZERO_PAGE, stx, 3)
-    NI
-    I(IMPLIED, dey, 2)
-    NI
-    I(IMPLIED, txa, 2)
-    NI
-    I(ABSOLUTE, sty, 4)
-    I(ABSOLUTE, sta, 4)
-    I(ABSOLUTE, stx, 4)
-    NI
-    IB(RELATIVE, bcc, 2)
-    I(ZERO_PAGE_INDIRECT_Y, sta, 6)
-    NI
-    NI
-    I(ZERO_PAGE_X, sty, 4)
-    I(ZERO_PAGE_X, sta, 4)
-    I(ZERO_PAGE_Y, stx, 4)
-    NI
-    I(IMPLIED, tya, 2)
-    I(ABSOLUTE_Y, sta, 5)
-    I(IMPLIED, txs, 2)
-    NI
-    NI
-    I(ABSOLUTE_X, sta, 5)
-    NI
-    NI
-    I(IMMEDIATE, ldy, 2)
-    I(ZERO_PAGE_INDIRECT, lda, 6)
-    I(IMMEDIATE, ldx, 2)
-    NI
-    I(ZERO_PAGE, ldy, 3)
-    I(ZERO_PAGE, lda, 3)
-    I(ZERO_PAGE, ldx, 3)
-    NI
-    I(IMPLIED, tay, 2)
-    I(IMMEDIATE, lda, 2)
-    I(IMPLIED, tax, 2)
-    NI
-    I(ABSOLUTE, ldy, 4)
-    I(ABSOLUTE, lda, 4)
-    I(ABSOLUTE, ldx, 4)
-    NI
-    IB(RELATIVE, bcs, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, lda, 5)
-    NI
-    NI
-    I(ZERO_PAGE_X, ldy, 4)
-    I(ZERO_PAGE_X, lda, 4)
-    I(ZERO_PAGE_Y, ldx, 4)
-    NI
-    I(IMPLIED, clv, 2)
-    IC(ABSOLUTE_Y, lda, 4)
-    I(IMPLIED, tsx, 2)
-    NI
-    IC(ABSOLUTE_X, ldy, 4)
-    IC(ABSOLUTE_X, lda, 4)
-    IC(ABSOLUTE_Y, ldx, 4)
-    NI
-    I(IMMEDIATE, cpy, 2)
-    I(ZERO_PAGE_INDIRECT, cmp, 6)
-    NI
-    NI
-    I(ZERO_PAGE, cpy, 3)
-    I(ZERO_PAGE, cmp, 3)
-    I(ZERO_PAGE, dec, 5)
-    NI
-    I(IMPLIED, iny, 2)
-    I(IMMEDIATE, cmp, 2)
-    I(IMPLIED, dex, 2)
-    NI
-    I(ABSOLUTE, cpy, 4)
-    I(ABSOLUTE, cmp, 4)
-    I(ABSOLUTE, dec, 6)
-    NI
-    IB(RELATIVE, bne, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, cmp, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, cmp, 4)
-    I(ZERO_PAGE_X, dec, 6)
-    NI
-    I(IMPLIED, cld, 2)
-    IC(ABSOLUTE_Y, cmp, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, cmp, 4)
-    I(ABSOLUTE_X, dec, 7)
-    NI
-    I(IMMEDIATE, cpx, 2)
-    I(ZERO_PAGE_INDIRECT, sbc, 6)
-    NI
-    NI
-    I(ZERO_PAGE, cpx, 3)
-    I(ZERO_PAGE, sbc, 3)
-    I(ZERO_PAGE, inc, 5)
-    NI
-    I(IMPLIED, inx, 2)
-    I(IMMEDIATE, sbc, 2)
-    I(IMPLIED, nop, 2)
-    NI
-    I(ABSOLUTE, cpx, 4)
-    I(ABSOLUTE, sbc, 4)
-    I(ABSOLUTE, inc, 6)
-    NI
-    IB(RELATIVE, beq, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, sbc, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, sbc, 4)
-    I(ZERO_PAGE_X, inc, 6)
-    NI
-    I(IMPLIED, sed, 2)
-    IC(ABSOLUTE_Y, sbc, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, sbc, 4)
-    I(ABSOLUTE_X, inc, 7)
-    NI
-};
+    I(IMPLIED, brk, 7),
+    I(ZERO_PAGE_INDIRECT, ora, 6),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE, ora, 3),
+    I(ZERO_PAGE, asl, 5),
+    NI,
+    I(IMPLIED, php, 3),
+    I(IMMEDIATE, ora, 2),
+    I(ACCUMULATOR, asl, 2),
+    NI,
+    NI,
+    I(ABSOLUTE, ora, 4),
+    I(ABSOLUTE, asl, 6),
+    NI,
+    IB(RELATIVE, bpl, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, ora, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, ora, 4),
+    I(ZERO_PAGE_X, asl, 6),
+    NI,
+    I(IMPLIED, clc, 2),
+    IC(ABSOLUTE_Y, ora, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, ora, 4),
+    I(ABSOLUTE_X, asl, 7),
+    NI,
+    I(ABSOLUTE, jsr, 6),
+    I(ZERO_PAGE_INDIRECT, and, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE, bit, 3),
+    I(ZERO_PAGE, and, 3),
+    I(ZERO_PAGE, rol, 5),
+    NI,
+    I(IMPLIED, plp, 4),
+    I(IMMEDIATE, and, 2),
+    I(ACCUMULATOR, rol, 2),
+    NI,
+    I(ABSOLUTE, bit, 4),
+    I(ABSOLUTE, and, 4),
+    I(ABSOLUTE, rol, 6),
+    NI,
+    IB(RELATIVE, bmi, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, and, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, and, 4),
+    I(ZERO_PAGE_X, rol, 6),
+    NI,
+    I(IMPLIED, sec, 2),
+    IC(ABSOLUTE_Y, and, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, and, 4),
+    I(ABSOLUTE_X, rol, 7),
+    NI,
+    I(IMPLIED, rti, 6),
+    I(ZERO_PAGE_INDIRECT, eor, 6),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE, eor, 3),
+    I(ZERO_PAGE, lsr, 5),
+    NI,
+    I(IMPLIED, pha, 3),
+    I(IMMEDIATE, eor, 2),
+    I(ACCUMULATOR, lsr, 2),
+    NI,
+    I(ABSOLUTE, jmp, 3),
+    I(ABSOLUTE, eor, 4),
+    I(ABSOLUTE, lsr, 6),
+    NI,
+    IB(RELATIVE, bvc, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, eor, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, eor, 4),
+    I(ZERO_PAGE_X, lsr, 6),
+    NI,
+    I(IMPLIED, cli, 2),
+    IC(ABSOLUTE_Y, eor, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, eor, 4),
+    I(ABSOLUTE_X, lsr, 7),
+    NI,
+    I(IMPLIED, rts, 6),
+    I(ZERO_PAGE_INDIRECT, adc, 6),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE, adc, 3),
+    I(ZERO_PAGE, ror, 5),
+    NI,
+    I(IMPLIED, pla, 4),
+    I(IMMEDIATE, adc, 2),
+    I(ACCUMULATOR, ror, 2),
+    NI,
+    I(INDIRECT, jmp, 5),
+    I(ABSOLUTE, adc, 4),
+    I(ABSOLUTE, ror, 6),
+    NI,
+    IB(RELATIVE, bvs, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, adc, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, adc, 4),
+    I(ZERO_PAGE_X, ror, 6),
+    NI,
+    I(IMPLIED, sei, 2),
+    IC(ABSOLUTE_Y, adc, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, adc, 4),
+    I(ABSOLUTE_X, ror, 7),
+    NI,
+    NI,
+    I(ZERO_PAGE_INDIRECT, sta, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE, sty, 3),
+    I(ZERO_PAGE, sta, 3),
+    I(ZERO_PAGE, stx, 3),
+    NI,
+    I(IMPLIED, dey, 2),
+    NI,
+    I(IMPLIED, txa, 2),
+    NI,
+    I(ABSOLUTE, sty, 4),
+    I(ABSOLUTE, sta, 4),
+    I(ABSOLUTE, stx, 4),
+    NI,
+    IB(RELATIVE, bcc, 2),
+    I(ZERO_PAGE_INDIRECT_Y, sta, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE_X, sty, 4),
+    I(ZERO_PAGE_X, sta, 4),
+    I(ZERO_PAGE_Y, stx, 4),
+    NI,
+    I(IMPLIED, tya, 2),
+    I(ABSOLUTE_Y, sta, 5),
+    I(IMPLIED, txs, 2),
+    NI,
+    NI,
+    I(ABSOLUTE_X, sta, 5),
+    NI,
+    NI,
+    I(IMMEDIATE, ldy, 2),
+    I(ZERO_PAGE_INDIRECT, lda, 6),
+    I(IMMEDIATE, ldx, 2),
+    NI,
+    I(ZERO_PAGE, ldy, 3),
+    I(ZERO_PAGE, lda, 3),
+    I(ZERO_PAGE, ldx, 3),
+    NI,
+    I(IMPLIED, tay, 2),
+    I(IMMEDIATE, lda, 2),
+    I(IMPLIED, tax, 2),
+    NI,
+    I(ABSOLUTE, ldy, 4),
+    I(ABSOLUTE, lda, 4),
+    I(ABSOLUTE, ldx, 4),
+    NI,
+    IB(RELATIVE, bcs, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, lda, 5),
+    NI,
+    NI,
+    I(ZERO_PAGE_X, ldy, 4),
+    I(ZERO_PAGE_X, lda, 4),
+    I(ZERO_PAGE_Y, ldx, 4),
+    NI,
+    I(IMPLIED, clv, 2),
+    IC(ABSOLUTE_Y, lda, 4),
+    I(IMPLIED, tsx, 2),
+    NI,
+    IC(ABSOLUTE_X, ldy, 4),
+    IC(ABSOLUTE_X, lda, 4),
+    IC(ABSOLUTE_Y, ldx, 4),
+    NI,
+    I(IMMEDIATE, cpy, 2),
+    I(ZERO_PAGE_INDIRECT, cmp, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE, cpy, 3),
+    I(ZERO_PAGE, cmp, 3),
+    I(ZERO_PAGE, dec, 5),
+    NI,
+    I(IMPLIED, iny, 2),
+    I(IMMEDIATE, cmp, 2),
+    I(IMPLIED, dex, 2),
+    NI,
+    I(ABSOLUTE, cpy, 4),
+    I(ABSOLUTE, cmp, 4),
+    I(ABSOLUTE, dec, 6),
+    NI,
+    IB(RELATIVE, bne, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, cmp, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, cmp, 4),
+    I(ZERO_PAGE_X, dec, 6),
+    NI,
+    I(IMPLIED, cld, 2),
+    IC(ABSOLUTE_Y, cmp, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, cmp, 4),
+    I(ABSOLUTE_X, dec, 7),
+    NI,
+    I(IMMEDIATE, cpx, 2),
+    I(ZERO_PAGE_INDIRECT, sbc, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE, cpx, 3),
+    I(ZERO_PAGE, sbc, 3),
+    I(ZERO_PAGE, inc, 5),
+    NI,
+    I(IMPLIED, inx, 2),
+    I(IMMEDIATE, sbc, 2),
+    I(IMPLIED, nop, 2),
+    NI,
+    I(ABSOLUTE, cpx, 4),
+    I(ABSOLUTE, sbc, 4),
+    I(ABSOLUTE, inc, 6),
+    NI,
+    IB(RELATIVE, beq, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, sbc, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, sbc, 4),
+    I(ZERO_PAGE_X, inc, 6),
+    NI,
+    I(IMPLIED, sed, 2),
+    IC(ABSOLUTE_Y, sbc, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, sbc, 4),
+    I(ABSOLUTE_X, inc, 7),
+    NI};
 
 #undef I
 #undef IB

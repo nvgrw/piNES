@@ -271,28 +271,40 @@ bool rom_has_bus_conflicts(mapper* mapper) {
   return false;
 }
 
+#define MEMACCESS_VALID(WHAT, WHERE, EXACTLY, WRITE)                        \
+  if (mapper->mapped.WHAT == NULL) {                                        \
+    fprintf(stderr,                                                         \
+            "WARNING: Unable to access %s[0x%04x] (mapped[0x%04x], %s).\n", \
+            #WHAT, WHERE, EXACTLY, WRITE ? "w" : "r");                      \
+  } else
+
 // Memory access functions
 void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
-    mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE] = val;
-    return;
+    MEMACCESS_VALID(ram, (address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE, address,
+                    true) {
+      mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE] = val;
+    }
   }
+
   if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
       address == 0x4014) {
     ppu_mem_write(mapper->ppu, address, val);
-    return;
   }
+
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
-    mapper->mapped.registers[address - MC_REGISTERS_BASE] = val;
+    MEMACCESS_VALID(registers, address - MC_REGISTERS_BASE, address, true) {
+      mapper->mapped.registers[address - MC_REGISTERS_BASE] = val;
+    }
+
     apu_mem_write(mapper->apu, address, val);
     controller_mem_write(mapper->controller, address, val);
   }
 
-  return;
-
   if (address >= MC_SRAM_BASE && address < MC_SRAM_UPPER) {
-    mapper->mapped.sram[address - MC_SRAM_BASE] = val;
-    return;
+    MEMACCESS_VALID(sram, address - MC_SRAM_BASE, address, true) {
+      mapper->mapped.sram[address - MC_SRAM_BASE] = val;
+    }
   }
 
   MAPPERS[rom_get_mapper_number(mapper)].cpu_write(mapper, address, val);
@@ -300,12 +312,16 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
 
 uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
-    return mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE];
+    MEMACCESS_VALID(ram, address - MC_WORK_RAM_BASE, address, false) {
+      return mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE];
+    }
   }
+
   if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
       address == 0x4014) {
     return ppu_mem_read(mapper->ppu, address, dummy);
   }
+
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
     if (address == 0x4015) {  // APU status register
       return apu_mem_read(mapper->apu, address);
@@ -316,26 +332,36 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
       return controller_mem_read(mapper->controller, address);
     }
 
-    return mapper->mapped.registers[address - MC_REGISTERS_BASE];
+    MEMACCESS_VALID(registers, address - MC_REGISTERS_BASE, address, false) {
+      return mapper->mapped.registers[address - MC_REGISTERS_BASE];
+    }
   }
-  return mapper->mapped.prg_rom1[address % 0x4000];
 
   if (address >= MC_CART_EXPANSION_ROM_BASE &&
       address < MC_CART_EXPANSION_ROM_UPPER) {
-    return 0;
-    return mapper->mapped
-        .cart_expansion_rom[address - MC_CART_EXPANSION_ROM_BASE];
+    MEMACCESS_VALID(cart_expansion_rom, address - MC_CART_EXPANSION_ROM_BASE,
+                    address, false) {
+      return mapper->mapped
+          .cart_expansion_rom[address - MC_CART_EXPANSION_ROM_BASE];
+    }
   }
+
   if (address >= MC_SRAM_BASE && address < MC_SRAM_UPPER) {
-    return 0;
-    return mapper->mapped.sram[address - MC_SRAM_BASE];
+    MEMACCESS_VALID(sram, address - MC_SRAM_BASE, address, false) {
+      return mapper->mapped.sram[address - MC_SRAM_BASE];
+    }
   }
+
   if (address >= MC_PRG_ROM1_BASE && address < MC_PRG_ROM1_UPPER) {
-    return mapper->mapped.prg_rom1[address - MC_PRG_ROM1_BASE];
+    MEMACCESS_VALID(prg_rom1, address - MC_PRG_ROM1_BASE, address, false) {
+      return mapper->mapped.prg_rom1[address - MC_PRG_ROM1_BASE];
+    }
   }
+
   if (address >= MC_PRG_ROM2_BASE && address <= MC_PRG_ROM2_UPPER) {
-    return 0;
-    return mapper->mapped.prg_rom2[address - MC_PRG_ROM2_BASE];
+    MEMACCESS_VALID(prg_rom2, address - MC_PRG_ROM2_BASE, address, false) {
+      return mapper->mapped.prg_rom2[address - MC_PRG_ROM2_BASE];
+    }
   }
 
   return MAPPERS[rom_get_mapper_number(mapper)].cpu_read(mapper, address);
@@ -359,10 +385,12 @@ void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
     mapper->mapped.ppu_pattable0[address - MC_PATTABLE0_BASE] = val;
     return;
   }
+
   if (address >= MC_PATTABLE1_BASE && address < MC_PATTABLE1_UPPER) {
     mapper->mapped.ppu_pattable1[address - MC_PATTABLE1_BASE] = val;
     return;
   }
+
   if (address >= MC_NAMETABLE0_BASE && address < MC_NAMETABLE0_UPPER) {
     mapper->mapped.ppu_nametable0[address - MC_NAMETABLE0_BASE] = val;
     return;
