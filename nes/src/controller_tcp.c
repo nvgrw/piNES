@@ -78,7 +78,7 @@ void controller_tcp_poll(controller_t* ctrl) {
     tcp.newsockfd =
         accept(tcp.sockfd, (struct sockaddr*)&tcp.cli_addr, &tcp.clilen);
     if (tcp.newsockfd < 0) {
-      perror("ERROR on accept");
+      //  perror("ERROR on accept");
       return;
     }
     // Connection established with client
