@@ -7,8 +7,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include "../include/controller.h"
-#include "../include/controller_tcp.h"
+#include "controller.h"
+#include "controller_tcp.h"
 #include "error.h"
 
 #define PORT_NO 51717
@@ -38,6 +38,9 @@ static struct {
   struct sockaddr_in cli_addr;
 } tcp;
 
+bool has_client = false;
+static uint8_t buffer[2] = {0, 0};
+
 int controller_tcp_init(void) {
   // Initialise socket
   tcp.sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -58,26 +61,27 @@ int controller_tcp_init(void) {
   }
   listen(tcp.sockfd, 5);
   tcp.clilen = sizeof(tcp.cli_addr);
-  tcp.newsockfd =
-      accept(tcp.sockfd, (struct sockaddr*)&tcp.cli_addr, &tcp.clilen);
-  if (tcp.newsockfd < 0) {
-    perror("ERROR on accept");
-    return 1;
-  }
-  // Connection established with client
   return 0;
 }
 
-static uint8_t buffer[2] = {0, 0};
-
 void controller_tcp_poll(controller_t* ctrl) {
   int n;  // return value for read() and write()
+  if (!has_client) {
+    tcp.newsockfd =
+        accept(tcp.sockfd, (struct sockaddr*)&tcp.cli_addr, &tcp.clilen);
+    if (tcp.newsockfd < 0) {
+      perror("ERROR on accept");
+      return;
+    }
+    // Connection established with client
+    has_client = true;
+  }
   n = read(tcp.newsockfd, buffer, 2);
   if (n == 2) {
     ctrl_1.raw = buffer[0];
     ctrl_2.raw = buffer[1];
   }
-  n = write(newsockfd, "Status received", 15);
+  n = write(tcp.newsockfd, "Status received", 15);
   ctrl->pressed1.a |= ctrl_1.ctrl1_state.a;
   ctrl->pressed1.b |= ctrl_1.ctrl1_state.b;
   ctrl->pressed1.select |= ctrl_1.ctrl1_state.select;

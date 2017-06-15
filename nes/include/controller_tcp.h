@@ -12,4 +12,4 @@
 
 int controller_tcp_init(void);
 void controller_tcp_poll(controller_t* ctrl);
-void controller_nes_deinit(void);
+void controller_tcp_deinit(void);

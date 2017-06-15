@@ -2,12 +2,10 @@
 
 /**
  * profiler.h
- * 
+ *
  * Functions and macros to allow profiling the emulator in realtime to find
  * bottleneck functions, CPU-intensive code, etc.
  */
-
-#define PROFILER 1
 
 typedef enum {
   PROF_START, // front runloop start

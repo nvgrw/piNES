@@ -4,7 +4,7 @@
 
 /**
  * controller.h
- * 
+ *
  * Structs and functions for dealing with the standard NES controller devices,
  * and "drivers" to emulate them.
  */
@@ -60,7 +60,7 @@ typedef struct {
 typedef struct {
   /**
    * Initialises the controller driver.
-   * 
+   *
    * Returns EC_SUCCESS in the case of success and EC_FAILURE if the driver
    * coundn't be initalised. Common causes of failure are lack of root access
    * (for the GPIO driver).
@@ -100,9 +100,9 @@ void controller_mem_write(controller_t* ctrl, uint16_t address, uint8_t value);
 uint8_t controller_mem_read(controller_t* ctrl, uint16_t address);
 
 #ifdef IS_PI
-#define NUM_CONTROLLER_DRIVERS 2
+#define NUM_CONTROLLER_DRIVERS 3
 #else
-#define NUM_CONTROLLER_DRIVERS 1
+#define NUM_CONTROLLER_DRIVERS 2
 #endif
 
 /**
