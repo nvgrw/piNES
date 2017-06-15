@@ -11,12 +11,10 @@
 
 /**
  * Public functions
- * 
+ *
  * See controller.h for descriptions.
  */
-controller_t* controller_init(void) {
-  return calloc(1, sizeof(controller_t));
-}
+controller_t* controller_init(void) { return calloc(1, sizeof(controller_t)); }
 
 void controller_clear(controller_t* ctrl) {
   ctrl->pressed1.a = 0;
@@ -37,9 +35,7 @@ void controller_clear(controller_t* ctrl) {
   ctrl->pressed2.right = 0;
 }
 
-void controller_deinit(controller_t* ctrl) {
-  free(ctrl);
-}
+void controller_deinit(controller_t* ctrl) { free(ctrl); }
 
 void controller_mem_write(controller_t* ctrl, uint16_t address, uint8_t value) {
   switch (address) {
@@ -62,16 +58,34 @@ uint8_t controller_mem_read(controller_t* ctrl, uint16_t address) {
       ctrl_pressed = &ctrl->pressed2;
     }
     switch (*ctrl_status) {
-      case CTRLS_STROBE: return ctrl_pressed->a;
-      case CTRLS_PULL_A: (*ctrl_status)++; return ctrl_pressed->a;
-      case CTRLS_PULL_B: (*ctrl_status)++; return ctrl_pressed->b;
-      case CTRLS_PULL_SELECT: (*ctrl_status)++; return ctrl_pressed->select;
-      case CTRLS_PULL_START: (*ctrl_status)++; return ctrl_pressed->start;
-      case CTRLS_PULL_UP: (*ctrl_status)++; return ctrl_pressed->up;
-      case CTRLS_PULL_DOWN: (*ctrl_status)++; return ctrl_pressed->down;
-      case CTRLS_PULL_LEFT: (*ctrl_status)++; return ctrl_pressed->left;
-      case CTRLS_PULL_RIGHT: (*ctrl_status)++; return ctrl_pressed->right;
-      default: return 0;
+      case CTRLS_STROBE:
+        return ctrl_pressed->a;
+      case CTRLS_PULL_A:
+        (*ctrl_status)++;
+        return ctrl_pressed->a;
+      case CTRLS_PULL_B:
+        (*ctrl_status)++;
+        return ctrl_pressed->b;
+      case CTRLS_PULL_SELECT:
+        (*ctrl_status)++;
+        return ctrl_pressed->select;
+      case CTRLS_PULL_START:
+        (*ctrl_status)++;
+        return ctrl_pressed->start;
+      case CTRLS_PULL_UP:
+        (*ctrl_status)++;
+        return ctrl_pressed->up;
+      case CTRLS_PULL_DOWN:
+        (*ctrl_status)++;
+        return ctrl_pressed->down;
+      case CTRLS_PULL_LEFT:
+        (*ctrl_status)++;
+        return ctrl_pressed->left;
+      case CTRLS_PULL_RIGHT:
+        (*ctrl_status)++;
+        return ctrl_pressed->right;
+      default:
+        return 0;
     }
   }
   return 0;
@@ -79,7 +93,11 @@ uint8_t controller_mem_read(controller_t* ctrl, uint16_t address) {
 
 const controller_driver_t CONTROLLER_DRIVERS[NUM_CONTROLLER_DRIVERS] = {
 #ifdef IS_PI
-  {.init = &controller_nes_init, .poll = &controller_nes_poll, .deinit = &controller_nes_deinit},
+    {.init = &controller_nes_init,
+     .poll = &controller_nes_poll,
+     .deinit = &controller_nes_deinit},
 #endif
-  {.init = &controller_sdl_init, .poll = &controller_sdl_poll, .deinit = &controller_sdl_deinit},
+    {.init = &controller_sdl_init,
+     .poll = &controller_sdl_poll,
+     .deinit = &controller_sdl_deinit},
 };
