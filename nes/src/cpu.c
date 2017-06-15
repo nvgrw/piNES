@@ -1057,7 +1057,6 @@ const instruction_t INSTRUCTION_VECTOR[NUM_INSTRUCTIONS] = {
 
 #undef I
 #undef IC
-#undef IC
 #undef NI
 
 // Debugging utils
