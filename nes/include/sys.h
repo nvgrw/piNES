@@ -39,7 +39,7 @@ typedef enum {
 typedef struct {
   double clock;
   controller_t* controller;
-  cpu* cpu;
+  cpu_t* cpu;
   ppu_t* ppu;
   mapper* mapper;
   apu_t* apu;

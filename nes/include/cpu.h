@@ -25,9 +25,9 @@ typedef enum {
   CS_NONE,
   CS_TRAPPED,
   CS_UNSUPPORTED_INSTRUCTION
-} cpu_status;
+} cpu_status_t;
 
-typedef enum { INTRT_NONE, INTRT_IRQ, INTRT_NMI, INTRT_RESET } interrupt_type;
+typedef enum { INTRT_NONE, INTRT_IRQ, INTRT_NMI, INTRT_RESET } interrupt_type_t;
 
 /*
  * Based on specification(s) from:
@@ -76,39 +76,39 @@ typedef struct {
   bool branch_taken;
   bool nmi_detected;
   bool nmi_pending;
-  cpu_status status;
+  cpu_status_t status;
   uint8_t last_opcode;
   uint32_t busy;
-  interrupt_type last_interrupt;
-} cpu;
+  interrupt_type_t last_interrupt;
+} cpu_t;
 
 // Functions
-cpu* cpu_init();
-void cpu_nmi(cpu* cpu, bool nmi);
-void cpu_reset(cpu* cpu);
-void cpu_deinit(cpu* cpu);
-bool cpu_cycle(cpu* cpu);
+cpu_t* cpu_init();
+void cpu_nmi(cpu_t* cpu, bool nmi);
+void cpu_reset(cpu_t* cpu);
+void cpu_deinit(cpu_t* cpu);
+bool cpu_cycle(cpu_t* cpu);
 
 // Utilities
-uint8_t cpu_mem_read8(cpu* cpu, uint16_t address);
-void cpu_mem_write8(cpu* cpu, uint16_t address, uint8_t value);
-uint16_t cpu_mem_read16(cpu* cpu, uint16_t address);
-void cpu_mem_write16(cpu* cpu, uint16_t address, uint16_t value);
+uint8_t cpu_mem_read8(cpu_t* cpu, uint16_t address);
+void cpu_mem_write8(cpu_t* cpu, uint16_t address, uint8_t value);
+uint16_t cpu_mem_read16(cpu_t* cpu, uint16_t address);
+void cpu_mem_write16(cpu_t* cpu, uint16_t address, uint16_t value);
 
 /**
  * The 6502 has a bug where reading a 16 byte value that crosses a page will
  * wrap around the page instead
  */
-uint16_t cpu_mem_read16_bug(cpu* cpu, uint16_t address);
+uint16_t cpu_mem_read16_bug(cpu_t* cpu, uint16_t address);
 
-uint8_t pop8(cpu* cpu);
-void push8(cpu* cpu, uint8_t value);
-uint16_t pop16(cpu* cpu);
-void push16(cpu* cpu, uint16_t value);
+uint8_t pop8(cpu_t* cpu);
+void push8(cpu_t* cpu, uint8_t value);
+uint16_t pop16(cpu_t* cpu);
+void push16(cpu_t* cpu, uint16_t value);
 
 bool is_page_crossed(uint16_t address1, uint16_t address2);
 
-void cpu_interrupt(cpu* cpu, interrupt_type type);
+void cpu_interrupt(cpu_t* cpu, interrupt_type_t type);
 
 typedef enum {
   // A: Accumulator implied as operand
@@ -137,20 +137,20 @@ typedef enum {
   AM_ZERO_PAGE_INDIRECT_Y,
   // (a): Indirect
   AM_INDIRECT,
-} address_mode;
+} address_mode_t;
 
 typedef struct {
-  address_mode mode;
+  address_mode_t mode;
   char* mnemonic;
-  void (*implementation)(cpu* cpu, uint16_t address);
+  void (*implementation)(cpu_t* cpu, uint16_t address);
   uint8_t cycles;
   bool cycle_cross;
   bool cycle_branch;
-} instruction;
+} instruction_t;
 
-extern const instruction INSTRUCTION_VECTOR[NUM_INSTRUCTIONS];
+extern const instruction_t INSTRUCTION_VECTOR[NUM_INSTRUCTIONS];
 
 // Debugging utils
-const char* dbg_address_mode_to_string(address_mode mode);
+const char* dbg_address_mode_to_string(address_mode_t mode);
 
-void dbg_print_state(cpu* cpu);
+void dbg_print_state(cpu_t* cpu);

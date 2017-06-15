@@ -46,6 +46,7 @@ static char* HEXADECIMAL = "0123456789ABCDEF";
 static char* UNSUPPORTED_INSTRUCTION_MESSAGE =
     "0x00: Unsupported instruction encountered!";
 
+#ifdef PROFILER
 static uint8_t PROFILER_COLOURS[] = {
     0xFF, 0xFF, 0xFF, // PROF_START - PROF_EVENTS
     0xFF, 0xFF, 0xFF, // PROF_EVENTS - PROF_TICKS
@@ -59,6 +60,7 @@ static uint8_t PROFILER_COLOURS[] = {
     0xFF, 0xFF, 0xFF, // PROF_SYS_END - PROF_PREFLIP
     0xFF, 0xFF, 0xFF, // PROF_PREFLIP - PROF_END
   };
+#endif
 
 /**
  * Helper functions
