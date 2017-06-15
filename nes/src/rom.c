@@ -279,7 +279,7 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   }
   if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
       address == 0x4014) {
-    ppu_mem_write((ppu*)mapper->ppu, address, val);
+    ppu_mem_write(mapper->ppu, address, val);
     return;
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
@@ -304,7 +304,7 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
   }
   if ((address >= MC_PPU_CTRL_BASE && address < MC_PPU_CTRL_UPPER) ||
       address == 0x4014) {
-    return ppu_mem_read((ppu*)mapper->ppu, address, dummy);
+    return ppu_mem_read(mapper->ppu, address, dummy);
   }
   if (address >= MC_REGISTERS_BASE && address < MC_REGISTERS_UPPER) {
     if (address == 0x4015) {  // APU status register

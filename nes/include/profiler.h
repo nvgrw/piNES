@@ -15,7 +15,10 @@ typedef enum {
   PROF_TICKS, // tick logic done
   PROF_SYS_START,
   PROF_SYS_CPU,
-  PROF_SYS_PPU,
+  PROF_SYS_PPU_BG,
+  PROF_SYS_PPU_SPRITES,
+  PROF_SYS_PPU_LOGIC,
+  PROF_SYS_APU,
   PROF_SYS_END, // sys logic done
   PROF_PREFLIP, // preflip done
   PROF_END // flip (UI drawing) done

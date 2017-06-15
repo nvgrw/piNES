@@ -65,9 +65,11 @@ bool sys_run(sys* sys, uint32_t ms, void* context,
 
       ppu_cycle(sys->ppu);
 
+      PROFILER_POINT(SYS_PPU_LOGIC)
+
       apu_cycle(sys->apu, context, enqueue_audio);
 
-      PROFILER_POINT(SYS_PPU)
+      // PROFILER_POINT(SYS_APU)
 
       sys->clock -= CLOCK_PERIOD;
     }

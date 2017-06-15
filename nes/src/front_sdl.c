@@ -47,15 +47,17 @@ static char* UNSUPPORTED_INSTRUCTION_MESSAGE =
     "0x00: Unsupported instruction encountered!";
 
 static uint8_t PROFILER_COLOURS[] = {
-    0xFF, 0x11, 0x11,
-    0xFF, 0xFF, 0x11,
-    0xAA, 0xAA, 0xAA,
-    0x11, 0xFF, 0x11,
-    0x11, 0xFF, 0xFF,
-    0x11, 0x11, 0xFF,
-    0xFF, 0xAA, 0xAA,
-    0xFF, 0x11, 0xFF,
-    0xAA, 0xFF, 0xFF,
+    0xFF, 0xFF, 0xFF, // PROF_START - PROF_EVENTS
+    0xFF, 0xFF, 0xFF, // PROF_EVENTS - PROF_TICKS
+    0xFF, 0xFF, 0xFF, // PROF_TICKS - PROF_SYS_START
+    0xFF, 0x11, 0x11, // PROF_SYS_START - PROF_SYS_CPU
+    0x11, 0x11, 0x11, // PROF_SYS_CPU - PROF_SYS_PPU_BG
+    0x11, 0x11, 0xFF, // PROF_SYS_PPU_BG - PROF_SYS_PPU_SPRITES
+    0x11, 0xFF, 0x11, // PROF_SYS_PPU_SPRITES - PROF_SYS_PPU_LOGIC
+    0xFF, 0xFF, 0xFF, // PROF_SYS_PPU_LOGIC - PROF_SYS_APU
+    0xFF, 0xFF, 0xFF, // PROF_SYS_APU - PROF_SYS_END
+    0xFF, 0xFF, 0xFF, // PROF_SYS_END - PROF_PREFLIP
+    0xFF, 0xFF, 0xFF, // PROF_PREFLIP - PROF_END
   };
 
 /**
@@ -157,7 +159,7 @@ static void flip(front_sdl_impl* impl) {
   switch (impl->front->tab) {
     case FT_PPU: {
       // PPU OAM data
-      ppu* ppu = sys->ppu;
+      ppu_t* ppu = sys->ppu;
       display_number(impl, ppu->spr_count_max, 240, 8);
       uint16_t spr_y = 16;
       for (int i = 0; i < 64 && spr_y < 256; i++) {

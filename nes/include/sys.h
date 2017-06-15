@@ -39,7 +39,7 @@ typedef struct {
   double clock;
   controller_t* controller;
   cpu* cpu;
-  ppu* ppu;
+  ppu_t* ppu;
   mapper* mapper;
   apu_t* apu;
   region region;
