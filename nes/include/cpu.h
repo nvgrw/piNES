@@ -29,6 +29,8 @@ typedef enum {
 
 typedef enum { INTRT_NONE, INTRT_IRQ, INTRT_NMI, INTRT_RESET } interrupt_type_t;
 
+struct jit_instruction;
+
 /*
  * Based on specification(s) from:
  *
@@ -70,9 +72,9 @@ typedef struct {
   mapper* mapper;
   uint8_t* memory;
 
+  struct jit_instruction* compiled;
+
   // Misc
-  bool trap;
-  bool addressing_special;
   bool branch_taken;
   bool nmi_detected;
   bool nmi_pending;
@@ -82,31 +84,23 @@ typedef struct {
   interrupt_type_t last_interrupt;
 } cpu_t;
 
+/**
+ * JIT (Just-In-Time) compilation structs
+ */
+typedef struct jit_instruction {
+  bool compiled;
+  void (*execute)(cpu_t*, uint16_t);
+  uint16_t address;
+  uint8_t cycles;
+  uint8_t size;
+} jit_instruction_t;
+
 // Functions
 cpu_t* cpu_init();
 void cpu_nmi(cpu_t* cpu, bool nmi);
 void cpu_reset(cpu_t* cpu);
 void cpu_deinit(cpu_t* cpu);
 bool cpu_cycle(cpu_t* cpu);
-
-// Utilities
-uint8_t cpu_mem_read8(cpu_t* cpu, uint16_t address);
-void cpu_mem_write8(cpu_t* cpu, uint16_t address, uint8_t value);
-uint16_t cpu_mem_read16(cpu_t* cpu, uint16_t address);
-void cpu_mem_write16(cpu_t* cpu, uint16_t address, uint16_t value);
-
-/**
- * The 6502 has a bug where reading a 16 byte value that crosses a page will
- * wrap around the page instead
- */
-uint16_t cpu_mem_read16_bug(cpu_t* cpu, uint16_t address);
-
-uint8_t pop8(cpu_t* cpu);
-void push8(cpu_t* cpu, uint8_t value);
-uint16_t pop16(cpu_t* cpu);
-void push16(cpu_t* cpu, uint16_t value);
-
-bool is_page_crossed(uint16_t address1, uint16_t address2);
 
 void cpu_interrupt(cpu_t* cpu, interrupt_type_t type);
 
@@ -145,7 +139,6 @@ typedef struct {
   void (*implementation)(cpu_t* cpu, uint16_t address);
   uint8_t cycles;
   bool cycle_cross;
-  bool cycle_branch;
 } instruction_t;
 
 extern const instruction_t INSTRUCTION_VECTOR[NUM_INSTRUCTIONS];

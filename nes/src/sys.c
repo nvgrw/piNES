@@ -33,9 +33,7 @@ sys* sys_init(void) {
 
 // TODO: move this to region
 #define CLOCKS_PER_MILLISECOND 21477.272
-#define CPU_CYCLES_PER_SECOND (CLOCKS_PER_SECOND / 12.0)
-#define PPU_CYCLES_PER_SECOND (CLOCKS_PER_SECOND / 4.0)
-#define CLOCK_PERIOD (4.0 / CLOCKS_PER_MILLISECOND)
+#define CLOCK_PERIOD (12.0 / CLOCKS_PER_MILLISECOND)
 
 bool sys_run(sys* sys, uint32_t ms, void* context,
              apu_enqueue_audio_t enqueue_audio,
@@ -64,6 +62,8 @@ bool sys_run(sys* sys, uint32_t ms, void* context,
 
       PROFILER_POINT(SYS_CPU)
 
+      ppu_cycle(sys->ppu);
+      ppu_cycle(sys->ppu);
       ppu_cycle(sys->ppu);
 
       PROFILER_POINT(SYS_PPU_LOGIC)

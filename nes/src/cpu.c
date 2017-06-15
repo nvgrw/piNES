@@ -13,224 +13,36 @@
 
 // #define DEBUG 1
 
-cpu_t* cpu_init() {
-  cpu_t* ret = calloc(1, sizeof(cpu_t));
-  //ret->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
-  return ret;
+/**
+ * Memory access functions
+ */
+static bool is_page_crossed(uint16_t address1, uint16_t address2) {
+  return (address1 & PAGE_MASK) != ((address1 + 1) & PAGE_MASK);
 }
 
-void cpu_nmi(cpu_t* cpu, bool nmi) {
-  if (nmi && !cpu->nmi_detected) {
-    cpu->nmi_detected = true;
-    cpu->nmi_pending = true;
-  } else if (!nmi) {
-    cpu->nmi_detected = false;
-  }
-}
-
-void cpu_reset(cpu_t* cpu) {
-  cpu->register_status.raw = STATUS_DEFAULT;
-  cpu->stack_pointer = STACK_DEFAULT;
-  cpu->last_interrupt = INTRT_NONE;
-  cpu->status = CS_NONE;
-  cpu->busy = 7;
-  cpu->nmi_detected = false;
-  cpu->nmi_pending = false;
-
-  // Reset on power on (not done for tests)
-  cpu_interrupt(cpu, INTRT_RESET);
-}
-
-void cpu_deinit(cpu_t* cpu) {
-  //free(cpu->memory);
-  free(cpu);
-}
-
-void perform_irq(cpu_t* cpu);
-void perform_nmi(cpu_t* cpu);
-
-bool cpu_cycle(cpu_t* cpu) {
-  cpu->status = CS_NONE;
-
-  // Cycle only if not busy
-  if (cpu->busy) {
-    cpu->busy--;
-    return false;
-  }
-
-  if (cpu->nmi_pending) {
-    cpu->nmi_pending = false;
-    cpu_interrupt(cpu, INTRT_NMI);
-  }
-
-  // Handle interrupts
-  switch (cpu->last_interrupt) {
-    case INTRT_IRQ:
-      perform_irq(cpu);
-      cpu->last_interrupt = INTRT_NONE;
-      cpu->busy = 7 * 3;
-      return false;
-    case INTRT_NMI:
-      perform_nmi(cpu);
-      cpu->last_interrupt = INTRT_NONE;
-      cpu->busy = 7 * 3;
-      return false;
-    default:
-      break;
-  }
-
-  // Fetch & Decode Instruction
-  uint8_t opcode = cpu_mem_read8(cpu, cpu->program_counter);
-  instruction_t instr = INSTRUCTION_VECTOR[opcode];
-  uint8_t bytes_used = 0;
-  uint16_t address = 0;
-  bool page_crossed = false;
-  // Resolve effective address based on addressing mode
-  switch (instr.mode) {
-    case AM_ACCUMULATOR:
-    case AM_IMPLIED:
-      cpu->addressing_special = true;
-      bytes_used = 1;
-      break;
-    case AM_IMMEDIATE:
-      address = cpu->program_counter + 1;
-      bytes_used = 2;
-      break;
-    case AM_ABSOLUTE:
-      address = cpu_mem_read16(cpu, cpu->program_counter + 1);
-      bytes_used = 3;
-      break;
-    case AM_ZERO_PAGE:
-      address = cpu_mem_read8(cpu, cpu->program_counter + 1);
-      bytes_used = 2;
-      break;
-    case AM_RELATIVE: {
-      uint8_t offset = cpu_mem_read8(cpu, cpu->program_counter + 1);
-      /*
-       * The offset is a signed integer, so if geq than 0x80, the value is
-       * actually negative.
-       * PC incremented by 2 at the end, so the offset is between -126 and 129.
-       */
-      if (offset < 0x80) {
-        address = cpu->program_counter + 2 + offset;
-      } else {
-        address = cpu->program_counter + 2 + offset - 0x100;
-      }
-      bytes_used = 2;
-    } break;
-    case AM_ABSOLUTE_X:
-      address = cpu_mem_read16(cpu, cpu->program_counter + 1);
-      page_crossed = is_page_crossed(address, address + cpu->register_x);
-      address += cpu->register_x;
-      bytes_used = 3;
-      break;
-    case AM_ABSOLUTE_Y:
-      address = cpu_mem_read16(cpu, cpu->program_counter + 1);
-      page_crossed = is_page_crossed(address, address + cpu->register_y);
-      address += cpu->register_y;
-      bytes_used = 3;
-      break;
-    case AM_ZERO_PAGE_X:
-      address =
-          (cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_x) &
-          0xFF;
-      // ^ sum wraps around zero page
-      bytes_used = 2;
-      break;
-    case AM_ZERO_PAGE_Y:
-      address =
-          (cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_y) &
-          0xFF;
-      // ^ sum wraps around zero page
-      bytes_used = 2;
-      break;
-    case AM_ZERO_PAGE_INDIRECT:
-      address = cpu_mem_read16_bug(
-          cpu,
-          (cpu_mem_read8(cpu, cpu->program_counter + 1) + cpu->register_x) &
-              0xFF);
-      bytes_used = 2;
-      break;
-    case AM_ZERO_PAGE_INDIRECT_Y:
-      address = cpu_mem_read16_bug(
-                    cpu, cpu_mem_read8(cpu, cpu->program_counter + 1));
-      page_crossed = is_page_crossed(address, address + cpu->register_y);
-      address += cpu->register_y;
-      
-      bytes_used = 2;
-      break;
-    case AM_INDIRECT:
-      address = cpu_mem_read16_bug(
-          cpu, cpu_mem_read16(cpu, cpu->program_counter + 1));
-      bytes_used = 3;
-      break;
-  }
-
-#ifdef DEBUG
-  printf(
-      "Executing: %s + [%-6s] (0x%02x), pc = 0x%04x, op = 0x%04x, sp = 0x%02x, "
-      "st = 0x%02x, a = 0x%02x, x = 0x%02x, y = 0x%02x\n",
-      instr.mnemonic, dbg_address_mode_to_string(instr.mode), opcode,
-      cpu->program_counter, address, cpu->stack_pointer,
-      cpu->register_status.raw, cpu->register_a, cpu->register_x,
-      cpu->register_y);
-#endif
-
-  // Execute
-  uint16_t last_program_counter = cpu->program_counter;
-  cpu->program_counter += bytes_used;
-  cpu->branch_taken = false;
-  if (instr.implementation == NULL) {
-    printf("!!! UNSUPPORTED INSTRUCTION !!!\n");
-    dbg_print_state(cpu);
-    cpu->status = CS_UNSUPPORTED_INSTRUCTION;
-    cpu->last_opcode = opcode;
-    return true;
-  }
-  instr.implementation(cpu, address);
-
-  cpu->addressing_special = false;
-
-  // Trap detection
-  if (cpu->program_counter == last_program_counter) {
-    printf("!!! CPU TRAPPED !!!\n");
-    dbg_print_state(cpu);
-    cpu->status = CS_TRAPPED;
-    return true;
-  }
-
-  cpu->busy += instr.cycles * 3;
-  if (instr.cycle_cross && page_crossed) {
-    cpu->busy += 3;
-  }
-  if (instr.cycle_branch && cpu->branch_taken) {
-    cpu->busy += 3;
-  }
-  return false;
-}
-
-/* Utilities */
-uint8_t cpu_mem_read8(cpu_t* cpu, uint16_t address) {
+static uint8_t cpu_mem_read8(cpu_t* cpu, uint16_t address) {
   return mmap_cpu_read(cpu->mapper, address, false);
   //return cpu->memory[address];
 }
 
-void cpu_mem_write8(cpu_t* cpu, uint16_t address, uint8_t value) {
+static void cpu_mem_write8(cpu_t* cpu, uint16_t address, uint8_t value) {
   mmap_cpu_write(cpu->mapper, address, value);
   //cpu->memory[address] = value;
 }
 
-uint16_t cpu_mem_read16(cpu_t* cpu, uint16_t address) {
+static uint16_t cpu_mem_read16(cpu_t* cpu, uint16_t address) {
   return (((uint16_t)cpu_mem_read8(cpu, address + 1)) << 8) |
          (uint16_t)cpu_mem_read8(cpu, address);
 }
 
-void cpu_mem_write16(cpu_t* cpu, uint16_t address, uint16_t value) {
+/*
+static void cpu_mem_write16(cpu_t* cpu, uint16_t address, uint16_t value) {
   cpu_mem_write8(cpu, address, value & 0xFF);
   cpu_mem_write8(cpu, address + 1, (value >> 8) & 0xFF);
 }
+*/
 
-uint16_t cpu_mem_read16_bug(cpu_t* cpu, uint16_t address) {
+static uint16_t cpu_mem_read16_bug(cpu_t* cpu, uint16_t address) {
   if (is_page_crossed(address, address + 1)) {
     uint16_t wrapped_address = (address & PAGE_MASK) | ((address + 1) & 0xFF);
     return (((uint16_t)cpu_mem_read8(cpu, wrapped_address)) << 8) |
@@ -241,28 +53,27 @@ uint16_t cpu_mem_read16_bug(cpu_t* cpu, uint16_t address) {
   }
 }
 
-uint8_t pop8(cpu_t* cpu) {
+/**
+ * Stack functions
+ */
+static uint8_t pop8(cpu_t* cpu) {
   cpu->stack_pointer++;
   return cpu_mem_read8(cpu, STACK_PAGE | cpu->stack_pointer);
 }
 
-void push8(cpu_t* cpu, uint8_t value) {
+static void push8(cpu_t* cpu, uint8_t value) {
   cpu_mem_write8(cpu, STACK_PAGE | cpu->stack_pointer, value);
   cpu->stack_pointer--;
 }
 
-uint16_t pop16(cpu_t* cpu) {
+static uint16_t pop16(cpu_t* cpu) {
   uint16_t low = pop8(cpu);
   return (pop8(cpu) << 8) | low;
 }
 
-void push16(cpu_t* cpu, uint16_t value) {
-  push8(cpu, (value >> 8) & 0xFF);  // High byte
+static void push16(cpu_t* cpu, uint16_t value) {
+  push8(cpu, value >> 8);  // High byte
   push8(cpu, value & 0xFF);         // Low byte
-}
-
-bool is_page_crossed(uint16_t address1, uint16_t address2) {
-  return (address1 & PAGE_MASK) != ((address1 + 1) & PAGE_MASK);
 }
 
 void cpu_interrupt(cpu_t* cpu, interrupt_type_t type) {
@@ -286,6 +97,251 @@ void cpu_interrupt(cpu_t* cpu, interrupt_type_t type) {
 
   // Perform all other interrupts later
   cpu->last_interrupt = type;
+}
+
+/**
+ * Public functions
+ */
+void perform_irq(cpu_t* cpu);
+void perform_nmi(cpu_t* cpu);
+
+void instr_address(cpu_t* cpu, instruction_t instr, uint16_t pc,
+                   uint8_t* bytes_used, uint16_t* address, bool* page_crossed,
+                   bool* requires_state) {
+  *page_crossed = false;
+  // Resolve effective address based on addressing mode
+  switch (instr.mode) {
+    case AM_ACCUMULATOR:
+    case AM_IMPLIED:
+      *bytes_used = 1;
+      break;
+    case AM_IMMEDIATE:
+      *address = pc + 1;
+      *bytes_used = 2;
+      break;
+    case AM_ABSOLUTE:
+      *address = cpu_mem_read16(cpu, pc + 1);
+      *bytes_used = 3;
+      break;
+    case AM_ZERO_PAGE:
+      *address = cpu_mem_read8(cpu, pc + 1);
+      *bytes_used = 2;
+      break;
+    case AM_RELATIVE: {
+      uint8_t offset = cpu_mem_read8(cpu, pc + 1);
+      /**
+       * The offset is a signed integer, so if geq than 0x80, the value is
+       * actually negative.
+       * PC incremented by 2 at the end, so the offset is between -126 and 129.
+       */
+      if (offset < 0x80) {
+        *address = pc + 2 + offset;
+      } else {
+        *address = pc + 2 + offset - 0x100;
+      }
+      *bytes_used = 2;
+    } break;
+    case AM_ABSOLUTE_X:
+      *address = cpu_mem_read16(cpu, pc + 1);
+      *page_crossed = is_page_crossed(*address, *address + cpu->register_x);
+      *address += cpu->register_x;
+      *bytes_used = 3;
+      *requires_state = true;
+      break;
+    case AM_ABSOLUTE_Y:
+      *address = cpu_mem_read16(cpu, pc + 1);
+      *page_crossed = is_page_crossed(*address, *address + cpu->register_y);
+      *address += cpu->register_y;
+      *bytes_used = 3;
+      *requires_state = true;
+      break;
+    case AM_ZERO_PAGE_X:
+      *address = (cpu_mem_read8(cpu, pc + 1) + cpu->register_x) & 0xFF;
+      // ^ sum wraps around zero page
+      *bytes_used = 2;
+      *requires_state = true;
+      break;
+    case AM_ZERO_PAGE_Y:
+      *address = (cpu_mem_read8(cpu, pc + 1) + cpu->register_y) & 0xFF;
+      // ^ sum wraps around zero page
+      *bytes_used = 2;
+      *requires_state = true;
+      break;
+    case AM_ZERO_PAGE_INDIRECT:
+      *address = cpu_mem_read16_bug(
+          cpu, (cpu_mem_read8(cpu, pc + 1) + cpu->register_x) & 0xFF);
+      *bytes_used = 2;
+      *requires_state = true;
+      break;
+    case AM_ZERO_PAGE_INDIRECT_Y:
+      *address = cpu_mem_read16_bug(cpu, cpu_mem_read8(cpu, pc + 1));
+      *page_crossed = is_page_crossed(*address, *address + cpu->register_y);
+      *address += cpu->register_y;
+      *bytes_used = 2;
+      *requires_state = true;
+      break;
+    case AM_INDIRECT:
+      *address = cpu_mem_read16_bug(cpu, cpu_mem_read16(cpu, pc + 1));
+      *bytes_used = 3;
+      break;
+  }
+}
+
+void jit_one(cpu_t* cpu, uint16_t pc) {
+  uint8_t opcode = cpu_mem_read8(cpu, pc);
+  instruction_t instr = INSTRUCTION_VECTOR[opcode];
+  uint8_t bytes_used = 0;
+  uint16_t address = 0;
+  bool page_crossed = false;
+  bool requires_state = false;
+  instr_address(cpu, instr, pc, &bytes_used, &address,
+                &page_crossed, &requires_state);
+  if (!requires_state && instr.implementation != NULL) {
+    cpu->compiled[pc] = (jit_instruction_t){
+      .compiled = false,
+      .execute = instr.implementation,
+      .address = address,
+      .cycles = instr.cycles + (instr.cycle_cross && page_crossed ? 1 : 0),
+      .size = bytes_used
+    };
+  }
+}
+
+void jit_all(cpu_t* cpu) {
+  for (int i = 0; i < MEMORY_SIZE; i++) {
+    jit_one(cpu, i);
+  }
+}
+
+cpu_t* cpu_init() {
+  cpu_t* cpu = calloc(1, sizeof(cpu_t));
+  //ret->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
+  cpu->compiled = calloc(MEMORY_SIZE, sizeof(jit_instruction_t));
+  /*
+  for (int i = 0; i < MEMORY_SIZE; i++) {
+    cpu->compiled[i] = (jit_instruction_t){.compiled = false};
+  }
+  */
+  return cpu;
+}
+
+void cpu_nmi(cpu_t* cpu, bool nmi) {
+  if (nmi && !cpu->nmi_detected) {
+    cpu->nmi_detected = true;
+    cpu->nmi_pending = true;
+  } else if (!nmi) {
+    cpu->nmi_detected = false;
+  }
+}
+
+void cpu_reset(cpu_t* cpu) {
+  cpu->register_status.raw = STATUS_DEFAULT;
+  cpu->stack_pointer = STACK_DEFAULT;
+  cpu->last_interrupt = INTRT_NONE;
+  cpu->status = CS_NONE;
+  cpu->busy = 7;
+  cpu->nmi_detected = false;
+  cpu->nmi_pending = false;
+
+  // Precompile instructions
+  jit_all(cpu);
+
+  // Reset on power on (not done for tests)
+  cpu_interrupt(cpu, INTRT_RESET);
+}
+
+void cpu_deinit(cpu_t* cpu) {
+  //free(cpu->memory);
+  free(cpu->compiled);
+  free(cpu);
+}
+
+bool cpu_cycle(cpu_t* cpu) {
+  cpu->status = CS_NONE;
+
+  // Cycle only if not busy
+  if (cpu->busy) {
+    cpu->busy--;
+    return false;
+  }
+
+  if (cpu->nmi_pending) {
+    cpu->nmi_pending = false;
+    cpu_interrupt(cpu, INTRT_NMI);
+  }
+
+  // Handle interrupts
+  switch (cpu->last_interrupt) {
+    case INTRT_IRQ:
+      perform_irq(cpu);
+      cpu->last_interrupt = INTRT_NONE;
+      cpu->busy = 7;
+      return false;
+    case INTRT_NMI:
+      perform_nmi(cpu);
+      cpu->last_interrupt = INTRT_NONE;
+      cpu->busy = 7;
+      return false;
+    default:
+      break;
+  }
+
+  // Check for JIT
+  jit_instruction_t jit = cpu->compiled[cpu->program_counter];
+  if (jit.compiled) {
+    cpu->program_counter += jit.size;
+    cpu->branch_taken = false;
+    (*jit.execute)(cpu, jit.address);
+    cpu->busy += jit.cycles;
+    if (cpu->branch_taken) {
+      cpu->busy++;
+    }
+    return false;
+  }
+
+  // Fetch & Decode instruction
+  uint8_t opcode = cpu_mem_read8(cpu, cpu->program_counter);
+  instruction_t instr = INSTRUCTION_VECTOR[opcode];
+  uint8_t bytes_used = 0;
+  uint16_t address = 0;
+  bool page_crossed = false;
+  bool requires_state = false;
+  instr_address(cpu, instr, cpu->program_counter, &bytes_used, &address,
+                &page_crossed, &requires_state);
+
+#ifdef DEBUG
+  printf(
+      "Executing: %s + [%-6s] (0x%02x), pc = 0x%04x, op = 0x%04x, sp = 0x%02x, "
+      "st = 0x%02x, a = 0x%02x, x = 0x%02x, y = 0x%02x\n",
+      instr.mnemonic, dbg_address_mode_to_string(instr.mode), opcode,
+      cpu->program_counter, address, cpu->stack_pointer,
+      cpu->register_status.raw, cpu->register_a, cpu->register_x,
+      cpu->register_y);
+#endif
+
+  // Execute
+  if (instr.implementation == NULL) {
+    /*
+    printf("!!! UNSUPPORTED INSTRUCTION !!!\n");
+    dbg_print_state(cpu);
+    cpu->status = CS_UNSUPPORTED_INSTRUCTION;
+    cpu->last_opcode = cpu_mem_read8(cpu, opcode);
+    return true;
+    */
+    return false;
+  }
+  cpu->program_counter += bytes_used;
+  cpu->branch_taken = false;
+  instr.implementation(cpu, address);
+
+  cpu->busy += instr.cycles;
+  if (instr.cycle_cross && page_crossed) {
+    cpu->busy++;
+  }
+  if (cpu->branch_taken) {
+    cpu->busy++;
+  }
+  return false;
 }
 
 void perform_irq(cpu_t* cpu) {
@@ -351,27 +407,24 @@ void cpu_impl_and(cpu_t* cpu, uint16_t address) {
 }
 
 // Arithmetic shift left
+void cpu_impl_asl_special(cpu_t* cpu, uint16_t address) {
+  uint8_t result;
+  // We are dealing with the accumulator
+  // Set the carry bit to the old bit 7
+  cpu->register_status.flags.c = cpu->register_a >> 7 & 0x1;
+  cpu->register_a <<= 1;
+  result = cpu->register_a;
+  cpu_implcommon_set_zs(cpu, result);
+}
+
+// Arithmetic shift left
 void cpu_impl_asl(cpu_t* cpu, uint16_t address) {
   uint8_t result;
-  // Either accumulator OR memory
-  if (cpu->addressing_special) {
-    // We are dealing with the accumulator
-
-    // Set the carry bit to the old bit 7
-    cpu->register_status.flags.c = cpu->register_a >> 7 & 0x1;
-
-    cpu->register_a <<= 1;
-    result = cpu->register_a;
-  } else {
-    uint8_t value = cpu_mem_read8(cpu, address);
-
-    // Set the carry bit to the old bit 7
-    cpu->register_status.flags.c = value >> 7 & 0x1;
-
-    result = value << 1;
-    cpu_mem_write8(cpu, address, result);
-  }
-
+  uint8_t value = cpu_mem_read8(cpu, address);
+  // Set the carry bit to the old bit 7
+  cpu->register_status.flags.c = value >> 7 & 0x1;
+  result = value << 1;
+  cpu_mem_write8(cpu, address, result);
   cpu_implcommon_set_zs(cpu, result);
 }
 
@@ -554,27 +607,23 @@ void cpu_impl_ldy(cpu_t* cpu, uint16_t address) {
 }
 
 // Logical shift right
+void cpu_impl_lsr_special(cpu_t* cpu, uint16_t address) {
+  uint8_t result;
+  // We are dealing with the accumulator
+  // Set the carry bit to the old bit 0
+  cpu->register_status.flags.c = cpu->register_a & 0x1;
+  cpu->register_a >>= 1;
+  result = cpu->register_a;
+  cpu_implcommon_set_zs(cpu, result);
+}
+
 void cpu_impl_lsr(cpu_t* cpu, uint16_t address) {
   uint8_t result;
-  // Either accumulator OR memory
-  if (cpu->addressing_special) {
-    // We are dealing with the accumulator
-
-    // Set the carry bit to the old bit 0
-    cpu->register_status.flags.c = cpu->register_a & 0x1;
-
-    cpu->register_a >>= 1;
-    result = cpu->register_a;
-  } else {
-    uint8_t value = cpu_mem_read8(cpu, address);
-
-    // Set the carry bit to the old bit 0
-    cpu->register_status.flags.c = value & 0x1;
-
-    result = value >> 1;
-    cpu_mem_write8(cpu, address, result);
-  }
-
+  uint8_t value = cpu_mem_read8(cpu, address);
+  // Set the carry bit to the old bit 0
+  cpu->register_status.flags.c = value & 0x1;
+  result = value >> 1;
+  cpu_mem_write8(cpu, address, result);
   cpu_implcommon_set_zs(cpu, result);
 }
 
@@ -609,55 +658,50 @@ void cpu_impl_plp(cpu_t* cpu, uint16_t address) {
 }
 
 // Rotate left
-void cpu_impl_rol(cpu_t* cpu, uint16_t address) {
-  uint8_t value;
-  if (cpu->addressing_special) {
-    // We're dealing with the accumulator
-    value = cpu->register_a;
-  } else {
-    value = cpu_mem_read8(cpu, address);
-  }
-
+void cpu_impl_rol_special(cpu_t* cpu, uint16_t address) {
+  // We're dealing with the accumulator
+  uint8_t value = cpu->register_a;
   uint8_t old_bit_7 = value >> 7 & 0x1;
   value <<= 1;
   // Bit 0 is filled with the current value of the carry flag
   value |= cpu->register_status.flags.c;
   cpu->register_status.flags.c = old_bit_7;
+  cpu->register_a = value;
+  cpu_implcommon_set_zs(cpu, value);
+}
 
-  if (cpu->addressing_special) {
-    // We're dealing with the accumulator
-    cpu->register_a = value;
-  } else {
-    cpu_mem_write8(cpu, address, value);
-  }
-
+void cpu_impl_rol(cpu_t* cpu, uint16_t address) {
+  uint8_t value = cpu_mem_read8(cpu, address);
+  uint8_t old_bit_7 = value >> 7 & 0x1;
+  value <<= 1;
+  // Bit 0 is filled with the current value of the carry flag
+  value |= cpu->register_status.flags.c;
+  cpu->register_status.flags.c = old_bit_7;
+  cpu_mem_write8(cpu, address, value);
   cpu_implcommon_set_zs(cpu, value);
 }
 
 // Rotate right
-void cpu_impl_ror(cpu_t* cpu, uint16_t address) {
-  uint8_t value;
-  // Either accumulator OR memory
-  if (cpu->addressing_special) {
-    // We are dealing with the accumulator
-    value = cpu->register_a;
-  } else {
-    value = cpu_mem_read8(cpu, address);
-  }
-
+void cpu_impl_ror_special(cpu_t* cpu, uint16_t address) {
+  // We are dealing with the accumulator
+  uint8_t value = cpu->register_a;
   uint8_t old_bit_0 = value & 0x1;
   value >>= 1;
   // Bit 7 is filled with the current value of the carry flag
   value |= cpu->register_status.flags.c << 7;
   cpu->register_status.flags.c = old_bit_0;
+  cpu->register_a = value;
+  cpu_implcommon_set_zs(cpu, value);
+}
 
-  if (cpu->addressing_special) {
-    // We're dealing with the accumulator
-    cpu->register_a = value;
-  } else {
-    cpu_mem_write8(cpu, address, value);
-  }
-
+void cpu_impl_ror(cpu_t* cpu, uint16_t address) {
+  uint8_t value = cpu_mem_read8(cpu, address);
+  uint8_t old_bit_0 = value & 0x1;
+  value >>= 1;
+  // Bit 7 is filled with the current value of the carry flag
+  value |= cpu->register_status.flags.c << 7;
+  cpu->register_status.flags.c = old_bit_0;
+  cpu_mem_write8(cpu, address, value);
   cpu_implcommon_set_zs(cpu, value);
 }
 
@@ -745,277 +789,274 @@ void cpu_impl_tya(cpu_t* cpu, uint16_t address) {
 // Macros to define instructions
 #define I(A, B, C) \
   { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
-    .cycles = C, .cycle_cross = false, .cycle_branch = false },
-#define IB(A, B, C) \
-  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
-    .cycles = C, .cycle_cross = true, .cycle_branch = true },
+    .cycles = C, .cycle_cross = false }
 #define IC(A, B, C) \
   { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
-    .cycles = C, .cycle_cross = true, .cycle_branch = false },
+    .cycles = C, .cycle_cross = true }
 #define NI \
-  { .mode = AM_ACCUMULATOR, .mnemonic = "###", .implementation = NULL },
+  { .mode = AM_ACCUMULATOR, .mnemonic = "###", .implementation = NULL }
 
 const instruction_t INSTRUCTION_VECTOR[NUM_INSTRUCTIONS] = {
-    I(IMPLIED, brk, 7)
-    I(ZERO_PAGE_INDIRECT, ora, 6)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE, ora, 3)
-    I(ZERO_PAGE, asl, 5)
-    NI
-    I(IMPLIED, php, 3)
-    I(IMMEDIATE, ora, 2)
-    I(ACCUMULATOR, asl, 2)
-    NI
-    NI
-    I(ABSOLUTE, ora, 4)
-    I(ABSOLUTE, asl, 6)
-    NI
-    IB(RELATIVE, bpl, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, ora, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, ora, 4)
-    I(ZERO_PAGE_X, asl, 6)
-    NI
-    I(IMPLIED, clc, 2)
-    IC(ABSOLUTE_Y, ora, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, ora, 4)
-    I(ABSOLUTE_X, asl, 7)
-    NI
-    I(ABSOLUTE, jsr, 6)
-    I(ZERO_PAGE_INDIRECT, and, 6)
-    NI
-    NI
-    I(ZERO_PAGE, bit, 3)
-    I(ZERO_PAGE, and, 3)
-    I(ZERO_PAGE, rol, 5)
-    NI
-    I(IMPLIED, plp, 4)
-    I(IMMEDIATE, and, 2)
-    I(ACCUMULATOR, rol, 2)
-    NI
-    I(ABSOLUTE, bit, 4)
-    I(ABSOLUTE, and, 4)
-    I(ABSOLUTE, rol, 6)
-    NI
-    IB(RELATIVE, bmi, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, and, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, and, 4)
-    I(ZERO_PAGE_X, rol, 6)
-    NI
-    I(IMPLIED, sec, 2)
-    IC(ABSOLUTE_Y, and, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, and, 4)
-    I(ABSOLUTE_X, rol, 7)
-    NI
-    I(IMPLIED, rti, 6)
-    I(ZERO_PAGE_INDIRECT, eor, 6)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE, eor, 3)
-    I(ZERO_PAGE, lsr, 5)
-    NI
-    I(IMPLIED, pha, 3)
-    I(IMMEDIATE, eor, 2)
-    I(ACCUMULATOR, lsr, 2)
-    NI
-    I(ABSOLUTE, jmp, 3)
-    I(ABSOLUTE, eor, 4)
-    I(ABSOLUTE, lsr, 6)
-    NI
-    IB(RELATIVE, bvc, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, eor, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, eor, 4)
-    I(ZERO_PAGE_X, lsr, 6)
-    NI
-    I(IMPLIED, cli, 2)
-    IC(ABSOLUTE_Y, eor, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, eor, 4)
-    I(ABSOLUTE_X, lsr, 7)
-    NI
-    I(IMPLIED, rts, 6)
-    I(ZERO_PAGE_INDIRECT, adc, 6)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE, adc, 3)
-    I(ZERO_PAGE, ror, 5)
-    NI
-    I(IMPLIED, pla, 4)
-    I(IMMEDIATE, adc, 2)
-    I(ACCUMULATOR, ror, 2)
-    NI
-    I(INDIRECT, jmp, 5)
-    I(ABSOLUTE, adc, 4)
-    I(ABSOLUTE, ror, 6)
-    NI
-    IB(RELATIVE, bvs, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, adc, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, adc, 4)
-    I(ZERO_PAGE_X, ror, 6)
-    NI
-    I(IMPLIED, sei, 2)
-    IC(ABSOLUTE_Y, adc, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, adc, 4)
-    I(ABSOLUTE_X, ror, 7)
-    NI
-    NI
-    I(ZERO_PAGE_INDIRECT, sta, 6)
-    NI
-    NI
-    I(ZERO_PAGE, sty, 3)
-    I(ZERO_PAGE, sta, 3)
-    I(ZERO_PAGE, stx, 3)
-    NI
-    I(IMPLIED, dey, 2)
-    NI
-    I(IMPLIED, txa, 2)
-    NI
-    I(ABSOLUTE, sty, 4)
-    I(ABSOLUTE, sta, 4)
-    I(ABSOLUTE, stx, 4)
-    NI
-    IB(RELATIVE, bcc, 2)
-    I(ZERO_PAGE_INDIRECT_Y, sta, 6)
-    NI
-    NI
-    I(ZERO_PAGE_X, sty, 4)
-    I(ZERO_PAGE_X, sta, 4)
-    I(ZERO_PAGE_Y, stx, 4)
-    NI
-    I(IMPLIED, tya, 2)
-    I(ABSOLUTE_Y, sta, 5)
-    I(IMPLIED, txs, 2)
-    NI
-    NI
-    I(ABSOLUTE_X, sta, 5)
-    NI
-    NI
-    I(IMMEDIATE, ldy, 2)
-    I(ZERO_PAGE_INDIRECT, lda, 6)
-    I(IMMEDIATE, ldx, 2)
-    NI
-    I(ZERO_PAGE, ldy, 3)
-    I(ZERO_PAGE, lda, 3)
-    I(ZERO_PAGE, ldx, 3)
-    NI
-    I(IMPLIED, tay, 2)
-    I(IMMEDIATE, lda, 2)
-    I(IMPLIED, tax, 2)
-    NI
-    I(ABSOLUTE, ldy, 4)
-    I(ABSOLUTE, lda, 4)
-    I(ABSOLUTE, ldx, 4)
-    NI
-    IB(RELATIVE, bcs, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, lda, 5)
-    NI
-    NI
-    I(ZERO_PAGE_X, ldy, 4)
-    I(ZERO_PAGE_X, lda, 4)
-    I(ZERO_PAGE_Y, ldx, 4)
-    NI
-    I(IMPLIED, clv, 2)
-    IC(ABSOLUTE_Y, lda, 4)
-    I(IMPLIED, tsx, 2)
-    NI
-    IC(ABSOLUTE_X, ldy, 4)
-    IC(ABSOLUTE_X, lda, 4)
-    IC(ABSOLUTE_Y, ldx, 4)
-    NI
-    I(IMMEDIATE, cpy, 2)
-    I(ZERO_PAGE_INDIRECT, cmp, 6)
-    NI
-    NI
-    I(ZERO_PAGE, cpy, 3)
-    I(ZERO_PAGE, cmp, 3)
-    I(ZERO_PAGE, dec, 5)
-    NI
-    I(IMPLIED, iny, 2)
-    I(IMMEDIATE, cmp, 2)
-    I(IMPLIED, dex, 2)
-    NI
-    I(ABSOLUTE, cpy, 4)
-    I(ABSOLUTE, cmp, 4)
-    I(ABSOLUTE, dec, 6)
-    NI
-    IB(RELATIVE, bne, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, cmp, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, cmp, 4)
-    I(ZERO_PAGE_X, dec, 6)
-    NI
-    I(IMPLIED, cld, 2)
-    IC(ABSOLUTE_Y, cmp, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, cmp, 4)
-    I(ABSOLUTE_X, dec, 7)
-    NI
-    I(IMMEDIATE, cpx, 2)
-    I(ZERO_PAGE_INDIRECT, sbc, 6)
-    NI
-    NI
-    I(ZERO_PAGE, cpx, 3)
-    I(ZERO_PAGE, sbc, 3)
-    I(ZERO_PAGE, inc, 5)
-    NI
-    I(IMPLIED, inx, 2)
-    I(IMMEDIATE, sbc, 2)
-    I(IMPLIED, nop, 2)
-    NI
-    I(ABSOLUTE, cpx, 4)
-    I(ABSOLUTE, sbc, 4)
-    I(ABSOLUTE, inc, 6)
-    NI
-    IB(RELATIVE, beq, 2)
-    IC(ZERO_PAGE_INDIRECT_Y, sbc, 5)
-    NI
-    NI
-    NI
-    I(ZERO_PAGE_X, sbc, 4)
-    I(ZERO_PAGE_X, inc, 6)
-    NI
-    I(IMPLIED, sed, 2)
-    IC(ABSOLUTE_Y, sbc, 4)
-    NI
-    NI
-    NI
-    IC(ABSOLUTE_X, sbc, 4)
-    I(ABSOLUTE_X, inc, 7)
-    NI
+    I(IMPLIED, brk, 7),
+    I(ZERO_PAGE_INDIRECT, ora, 6),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE, ora, 3),
+    I(ZERO_PAGE, asl, 5),
+    NI,
+    I(IMPLIED, php, 3),
+    I(IMMEDIATE, ora, 2),
+    I(ACCUMULATOR, asl_special, 2),
+    NI,
+    NI,
+    I(ABSOLUTE, ora, 4),
+    I(ABSOLUTE, asl, 6),
+    NI,
+    IC(RELATIVE, bpl, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, ora, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, ora, 4),
+    I(ZERO_PAGE_X, asl, 6),
+    NI,
+    I(IMPLIED, clc, 2),
+    IC(ABSOLUTE_Y, ora, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, ora, 4),
+    I(ABSOLUTE_X, asl, 7),
+    NI,
+    I(ABSOLUTE, jsr, 6),
+    I(ZERO_PAGE_INDIRECT, and, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE, bit, 3),
+    I(ZERO_PAGE, and, 3),
+    I(ZERO_PAGE, rol, 5),
+    NI,
+    I(IMPLIED, plp, 4),
+    I(IMMEDIATE, and, 2),
+    I(ACCUMULATOR, rol_special, 2),
+    NI,
+    I(ABSOLUTE, bit, 4),
+    I(ABSOLUTE, and, 4),
+    I(ABSOLUTE, rol, 6),
+    NI,
+    IC(RELATIVE, bmi, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, and, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, and, 4),
+    I(ZERO_PAGE_X, rol, 6),
+    NI,
+    I(IMPLIED, sec, 2),
+    IC(ABSOLUTE_Y, and, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, and, 4),
+    I(ABSOLUTE_X, rol, 7),
+    NI,
+    I(IMPLIED, rti, 6),
+    I(ZERO_PAGE_INDIRECT, eor, 6),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE, eor, 3),
+    I(ZERO_PAGE, lsr, 5),
+    NI,
+    I(IMPLIED, pha, 3),
+    I(IMMEDIATE, eor, 2),
+    I(ACCUMULATOR, lsr_special, 2),
+    NI,
+    I(ABSOLUTE, jmp, 3),
+    I(ABSOLUTE, eor, 4),
+    I(ABSOLUTE, lsr, 6),
+    NI,
+    IC(RELATIVE, bvc, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, eor, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, eor, 4),
+    I(ZERO_PAGE_X, lsr, 6),
+    NI,
+    I(IMPLIED, cli, 2),
+    IC(ABSOLUTE_Y, eor, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, eor, 4),
+    I(ABSOLUTE_X, lsr, 7),
+    NI,
+    I(IMPLIED, rts, 6),
+    I(ZERO_PAGE_INDIRECT, adc, 6),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE, adc, 3),
+    I(ZERO_PAGE, ror, 5),
+    NI,
+    I(IMPLIED, pla, 4),
+    I(IMMEDIATE, adc, 2),
+    I(ACCUMULATOR, ror_special, 2),
+    NI,
+    I(INDIRECT, jmp, 5),
+    I(ABSOLUTE, adc, 4),
+    I(ABSOLUTE, ror, 6),
+    NI,
+    IC(RELATIVE, bvs, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, adc, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, adc, 4),
+    I(ZERO_PAGE_X, ror, 6),
+    NI,
+    I(IMPLIED, sei, 2),
+    IC(ABSOLUTE_Y, adc, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, adc, 4),
+    I(ABSOLUTE_X, ror, 7),
+    NI,
+    NI,
+    I(ZERO_PAGE_INDIRECT, sta, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE, sty, 3),
+    I(ZERO_PAGE, sta, 3),
+    I(ZERO_PAGE, stx, 3),
+    NI,
+    I(IMPLIED, dey, 2),
+    NI,
+    I(IMPLIED, txa, 2),
+    NI,
+    I(ABSOLUTE, sty, 4),
+    I(ABSOLUTE, sta, 4),
+    I(ABSOLUTE, stx, 4),
+    NI,
+    IC(RELATIVE, bcc, 2),
+    I(ZERO_PAGE_INDIRECT_Y, sta, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE_X, sty, 4),
+    I(ZERO_PAGE_X, sta, 4),
+    I(ZERO_PAGE_Y, stx, 4),
+    NI,
+    I(IMPLIED, tya, 2),
+    I(ABSOLUTE_Y, sta, 5),
+    I(IMPLIED, txs, 2),
+    NI,
+    NI,
+    I(ABSOLUTE_X, sta, 5),
+    NI,
+    NI,
+    I(IMMEDIATE, ldy, 2),
+    I(ZERO_PAGE_INDIRECT, lda, 6),
+    I(IMMEDIATE, ldx, 2),
+    NI,
+    I(ZERO_PAGE, ldy, 3),
+    I(ZERO_PAGE, lda, 3),
+    I(ZERO_PAGE, ldx, 3),
+    NI,
+    I(IMPLIED, tay, 2),
+    I(IMMEDIATE, lda, 2),
+    I(IMPLIED, tax, 2),
+    NI,
+    I(ABSOLUTE, ldy, 4),
+    I(ABSOLUTE, lda, 4),
+    I(ABSOLUTE, ldx, 4),
+    NI,
+    IC(RELATIVE, bcs, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, lda, 5),
+    NI,
+    NI,
+    I(ZERO_PAGE_X, ldy, 4),
+    I(ZERO_PAGE_X, lda, 4),
+    I(ZERO_PAGE_Y, ldx, 4),
+    NI,
+    I(IMPLIED, clv, 2),
+    IC(ABSOLUTE_Y, lda, 4),
+    I(IMPLIED, tsx, 2),
+    NI,
+    IC(ABSOLUTE_X, ldy, 4),
+    IC(ABSOLUTE_X, lda, 4),
+    IC(ABSOLUTE_Y, ldx, 4),
+    NI,
+    I(IMMEDIATE, cpy, 2),
+    I(ZERO_PAGE_INDIRECT, cmp, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE, cpy, 3),
+    I(ZERO_PAGE, cmp, 3),
+    I(ZERO_PAGE, dec, 5),
+    NI,
+    I(IMPLIED, iny, 2),
+    I(IMMEDIATE, cmp, 2),
+    I(IMPLIED, dex, 2),
+    NI,
+    I(ABSOLUTE, cpy, 4),
+    I(ABSOLUTE, cmp, 4),
+    I(ABSOLUTE, dec, 6),
+    NI,
+    IC(RELATIVE, bne, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, cmp, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, cmp, 4),
+    I(ZERO_PAGE_X, dec, 6),
+    NI,
+    I(IMPLIED, cld, 2),
+    IC(ABSOLUTE_Y, cmp, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, cmp, 4),
+    I(ABSOLUTE_X, dec, 7),
+    NI,
+    I(IMMEDIATE, cpx, 2),
+    I(ZERO_PAGE_INDIRECT, sbc, 6),
+    NI,
+    NI,
+    I(ZERO_PAGE, cpx, 3),
+    I(ZERO_PAGE, sbc, 3),
+    I(ZERO_PAGE, inc, 5),
+    NI,
+    I(IMPLIED, inx, 2),
+    I(IMMEDIATE, sbc, 2),
+    I(IMPLIED, nop, 2),
+    NI,
+    I(ABSOLUTE, cpx, 4),
+    I(ABSOLUTE, sbc, 4),
+    I(ABSOLUTE, inc, 6),
+    NI,
+    IC(RELATIVE, beq, 2),
+    IC(ZERO_PAGE_INDIRECT_Y, sbc, 5),
+    NI,
+    NI,
+    NI,
+    I(ZERO_PAGE_X, sbc, 4),
+    I(ZERO_PAGE_X, inc, 6),
+    NI,
+    I(IMPLIED, sed, 2),
+    IC(ABSOLUTE_Y, sbc, 4),
+    NI,
+    NI,
+    NI,
+    IC(ABSOLUTE_X, sbc, 4),
+    I(ABSOLUTE_X, inc, 7),
+    NI,
 };
 
 #undef I
-#undef IB
+#undef IC
 #undef IC
 #undef NI
 

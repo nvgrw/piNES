@@ -7,6 +7,8 @@
  * bottleneck functions, CPU-intensive code, etc.
  */
 
+#define PROFILER 1
+
 typedef enum {
   PROF_START,   // front runloop start
   PROF_EVENTS,  // SDL events polled and done
