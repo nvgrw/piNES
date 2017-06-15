@@ -425,7 +425,7 @@ static uint8_t apu_output_dmc(bool enabled, apu_channel_dmc_t* channel) {
   return 0;
 }
 
-static uint8_t apu_mix(apu_t* apu) {
+static apu_buffer_t apu_mix(apu_t* apu) {
   uint8_t pulse1_out = apu_output_pulse(apu->previous_status.data.enable_pulse1,
                                         &apu->channel_pulse1);
   uint8_t pulse2_out = apu_output_pulse(apu->previous_status.data.enable_pulse2,
@@ -439,18 +439,18 @@ static uint8_t apu_mix(apu_t* apu) {
   double pulse_out = apu->lookup_pulse_table[pulse1_out + pulse2_out];
   double tnd_out =
       apu->lookup_tnd_table[3 * triangle_out + 2 * noise_out + dmc_out];
-  return 255 * (pulse_out + tnd_out);
+  return 255.0 * (pulse_out + tnd_out - 0.5);
 }
 
 // ----- REST -----
-static void apu_write_to_buffer(apu_t* apu, uint8_t value) {
+static void apu_write_to_buffer(apu_t* apu, apu_buffer_t value) {
   apu->buffer[apu->buffer_cursor] = value;
   apu->buffer_cursor++;
   apu->buffer_cursor = apu->buffer_cursor % AUDIO_BUFFER_SIZE;
 }
 
-void apu_cycle(apu_t* apu, void* context,
-               void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
+void apu_cycle(apu_t* apu, void* context, apu_enqueue_audio_t enqueue_audio,
+               apu_get_queue_size_t get_queue_size) {
   // This function is called at the rate of the PPU. Only do something useful
   // every 3 cycles.
 
@@ -469,10 +469,9 @@ void apu_cycle(apu_t* apu, void* context,
   apu_frame_counter_clock(apu);
 
   // Skip samples/ downsample
-  if (apu->sample_skips <= 1.0) {
-    uint8_t val = apu_mix(apu);
-    // printf("VALU: %u\n", val);
-    apu_write_to_buffer(apu, val);
+  if (apu->sample_skips <= 0.0) {
+    apu_write_to_buffer(apu, apu_mix(apu));
+
     if (apu->buffer_cursor == 0) {
       enqueue_audio(context, apu->buffer, AUDIO_BUFFER_SIZE);
     }

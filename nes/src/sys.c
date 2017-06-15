@@ -37,7 +37,8 @@ sys* sys_init(void) {
 #define CLOCK_PERIOD (4.0 / CLOCKS_PER_MILLISECOND)
 
 bool sys_run(sys* sys, uint32_t ms, void* context,
-             void (*enqueue_audio)(void* context, uint8_t* buffer, int len)) {
+             apu_enqueue_audio_t enqueue_audio,
+             apu_get_queue_size_t get_queue_size) {
   if (sys->running) {
     sys->clock += ms;
     while (sys->clock >= CLOCK_PERIOD && sys->running) {
@@ -60,7 +61,7 @@ bool sys_run(sys* sys, uint32_t ms, void* context,
 
       ppu_cycle(sys->ppu);
 
-      apu_cycle(sys->apu, context, enqueue_audio);
+      apu_cycle(sys->apu, context, enqueue_audio, get_queue_size);
 
       sys->clock -= CLOCK_PERIOD;
     }

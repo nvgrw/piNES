@@ -417,8 +417,8 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   // Initialise audio
   SDL_AudioSpec audio_want, audio_have;
   audio_want.freq = APU_ACTUAL_SAMPLE_RATE;
-  audio_want.format = AUDIO_U8;
-  audio_want.samples = 512;
+  audio_want.format = AUDIO_S8;
+  audio_want.samples = 256;
   audio_want.callback = NULL;
   audio_want.channels = 1;
   audio_want.userdata = impl;
@@ -426,7 +426,7 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   if ((impl->audio_device = SDL_OpenAudioDevice(
            NULL, 0, &audio_want, &audio_have, SDL_AUDIO_ALLOW_FORMAT_CHANGE)) ==
       0) {
-    fprintf(stderr, "Could not create audio device\n");
+    fprintf(stderr, "Could not create audio device, %s\n", SDL_GetError());
     free(impl);
     return NULL;
   }
@@ -439,7 +439,9 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   return impl;
 }
 
-void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len);
+static void front_sdl_impl_audio_enqueue(void* context, apu_buffer_t* buffer,
+                                         int len);
+static apu_queued_size_t front_sdl_impl_audio_get_queue_size(void* context);
 
 void front_sdl_impl_run(front_sdl_impl* impl) {
   bool running = true;
@@ -567,7 +569,8 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
     }
 
     // Run the system for the time passed and display graphics
-    if (sys_run(sys, ticks_passed, impl, front_sdl_impl_audio_enqueue)) {
+    if (sys_run(sys, ticks_passed, impl, front_sdl_impl_audio_enqueue,
+                front_sdl_impl_audio_get_queue_size)) {
       // The system crashed
       switch (sys->status) {
         case SS_CPU_TRAPPED:
@@ -614,9 +617,15 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
   }
 }
 
-void front_sdl_impl_audio_enqueue(void* context, uint8_t* buffer, int len) {
+static void front_sdl_impl_audio_enqueue(void* context, apu_buffer_t* buffer,
+                                         int len) {
   front_sdl_impl* impl = (front_sdl_impl*)context;
   SDL_QueueAudio(impl->audio_device, buffer, len);
+}
+
+static apu_queued_size_t front_sdl_impl_audio_get_queue_size(void* context) {
+  front_sdl_impl* impl = (front_sdl_impl*)context;
+  return SDL_GetQueuedAudioSize(impl->audio_device);
 }
 
 void front_sdl_impl_deinit(front_sdl_impl* impl) {
