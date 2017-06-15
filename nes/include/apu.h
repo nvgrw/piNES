@@ -5,11 +5,15 @@
 #include <stdlib.h>
 
 #include "apu_channels.h"
+#include "apu_typedefs.h"
 #include "rom.h"
 
-#define APU_SAMPLE_RATE 1789800.0
+#define APU_SAMPLE_RATE 1789773.0
 #define APU_ACTUAL_SAMPLE_RATE 44100
 #define AUDIO_BUFFER_SIZE 256
+
+#define LU_PULSE_SIZE 31
+#define LU_TND_SIZE 203
 
 // Register bitfields
 typedef union {
@@ -160,7 +164,7 @@ typedef struct apu {
   // Outputting sound
   uint8_t cycle_count;
   double sample_skips;
-  uint8_t buffer[AUDIO_BUFFER_SIZE];
+  apu_buffer_t buffer[AUDIO_BUFFER_SIZE];
   int buffer_cursor;
   bool is_even_cycle;
 
@@ -182,6 +186,9 @@ typedef struct apu {
     bool reset_queued;
     uint8_t reset_queue_divider;
   } frame_counter;
+
+  double lookup_pulse_table[LU_PULSE_SIZE];
+  double lookup_tnd_table[LU_TND_SIZE];
 } apu_t;
 
 /**
@@ -199,5 +206,5 @@ uint8_t apu_mem_read(apu_t* apu, uint16_t address);
 /**
  * General output methods
  */
-void apu_cycle(apu_t* apu, void* context,
-               void (*enqueue_audio)(void* context, uint8_t* buffer, int len));
+void apu_cycle(apu_t* apu, void* context, apu_enqueue_audio_t enqueue_audio,
+               apu_get_queue_size_t get_queue_size);

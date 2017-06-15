@@ -39,7 +39,7 @@ void apu_channel_triangle_sequencer_clock(apu_timer_context_t* context) {
 void apu_channel_triangle_linear_counter_clock(
     apu_channel_triangle_t* channel) {
   if (channel->linear_counter_reload_flag) {
-    channel->linear_counter = channel->linear_counter_reload_flag;
+    channel->linear_counter = channel->c_linear_counter_reload;
   } else if (channel->linear_counter != 0) {
     channel->linear_counter--;
   }
