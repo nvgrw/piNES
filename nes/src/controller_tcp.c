@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -46,6 +47,13 @@ int controller_tcp_init(void) {
   tcp.sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (tcp.sockfd < 0) {
     perror("ERROR on opening socket");
+    return 1;
+  }
+  // Set socket to non-blocking
+  int status =
+      fcntl(tcp.sockfd, F_SETFL, fcntl(tcp.sockfd, F_GETFL, 0) | O_NONBLOCK);
+  if (status < 0) {
+    perror("ERROR on fcntl");
     return 1;
   }
   // Initialise server address
