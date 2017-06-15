@@ -19,14 +19,9 @@
  */
 
 static union {
-  controller_pressed_t ctrl1_state;
+  controller_pressed_t state;
   uint8_t raw;
-} ctrl_1;
-
-static union {
-  controller_pressed_t ctrl2_state;
-  uint8_t raw;
-} ctrl_2;
+} ctrl_1, ctrl_2;
 
 static struct {
   int sockfd;        // socket file descriptor
@@ -84,28 +79,28 @@ void controller_tcp_poll(controller_t* ctrl) {
     // Connection established with client
     has_client = true;
   }
-  n = read(tcp.newsockfd, buffer, 2);
-  if (n == 2) {
+  n = read(tcp.newsockfd, buffer, 1000);
+  if (n >= 2) {
     ctrl_1.raw = buffer[0];
     ctrl_2.raw = buffer[1];
   }
-  n = write(tcp.newsockfd, "Status received", 15);
-  ctrl->pressed1.a |= ctrl_1.ctrl1_state.a;
-  ctrl->pressed1.b |= ctrl_1.ctrl1_state.b;
-  ctrl->pressed1.select |= ctrl_1.ctrl1_state.select;
-  ctrl->pressed1.start |= ctrl_1.ctrl1_state.start;
-  ctrl->pressed1.up |= ctrl_1.ctrl1_state.up;
-  ctrl->pressed1.down |= ctrl_1.ctrl1_state.down;
-  ctrl->pressed1.left |= ctrl_1.ctrl1_state.left;
-  ctrl->pressed1.right |= ctrl_1.ctrl1_state.right;
-  ctrl->pressed2.a |= ctrl_2.ctrl2_state.a;
-  ctrl->pressed2.b |= ctrl_2.ctrl2_state.b;
-  ctrl->pressed2.select |= ctrl_2.ctrl2_state.select;
-  ctrl->pressed2.start |= ctrl_2.ctrl2_state.start;
-  ctrl->pressed2.up |= ctrl_2.ctrl2_state.up;
-  ctrl->pressed2.down |= ctrl_2.ctrl2_state.down;
-  ctrl->pressed2.left |= ctrl_2.ctrl2_state.left;
-  ctrl->pressed2.right |= ctrl_2.ctrl2_state.right;
+
+  ctrl->pressed1.a |= ctrl_1.state.a;
+  ctrl->pressed1.b |= ctrl_1.state.b;
+  ctrl->pressed1.select |= ctrl_1.state.select;
+  ctrl->pressed1.start |= ctrl_1.state.start;
+  ctrl->pressed1.up |= ctrl_1.state.up;
+  ctrl->pressed1.down |= ctrl_1.state.down;
+  ctrl->pressed1.left |= ctrl_1.state.left;
+  ctrl->pressed1.right |= ctrl_1.state.right;
+  ctrl->pressed2.a |= ctrl_2.state.a;
+  ctrl->pressed2.b |= ctrl_2.state.b;
+  ctrl->pressed2.select |= ctrl_2.state.select;
+  ctrl->pressed2.start |= ctrl_2.state.start;
+  ctrl->pressed2.up |= ctrl_2.state.up;
+  ctrl->pressed2.down |= ctrl_2.state.down;
+  ctrl->pressed2.left |= ctrl_2.state.left;
+  ctrl->pressed2.right |= ctrl_2.state.right;
 }
 
 void controller_tcp_deinit(void) {
