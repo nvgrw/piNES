@@ -68,7 +68,7 @@ static void ppu_cycle_addr_at(ppu_t* ppu) {
 static void ppu_cycle_fetch_at(ppu_t* ppu, bool garbage) {
   uint16_t v = ppu->v.raw;
   uint8_t shift = ((v >> 4) & 4) | (v & 2);
-  uint8_t res = ((mmap(ppu, ppu->io_addr) >> shift) & 3) << 2;
+  uint8_t res = (mmap(ppu, ppu->io_addr) >> shift) & 3;
   if (!garbage) {
     ppu->ren_at = res;
   }
@@ -91,61 +91,50 @@ static void ppu_cycle_bg_high(ppu_t* ppu) {
 static void ppu_cycle_tile(ppu_t* ppu) {
   uint32_t data = 0;
   for (uint8_t i = 0; i < 8; i++) {
-    uint8_t p1 = (ppu->ren_bg_low & 0x80) >> 7;
-    uint8_t p2 = (ppu->ren_bg_high & 0x80) >> 6;
-    ppu->ren_bg_low <<= 1;
-    ppu->ren_bg_high <<= 1;
     data <<= 4;
-    data |= (uint32_t)(ppu->ren_at | p1 | p2);
+    data |= ((ppu->ren_bg_low << i) & 0x80) >> 7;
+    data |= ((ppu->ren_bg_high << i) & 0x80) >> 6;
   }
+  data |= ppu->ren_at * 0x44444444;
   ppu->tile_data |= (uint64_t)data;
 }
 
 static uint32_t ppu_fetch_sprite(ppu_t* ppu, uint8_t i, uint16_t row) {
+  uint16_t bank = ppu->ctrl_sprite_table;
   uint8_t tile = ppu->oam.sprites[i].index;
   oam_attr_t attr = {.raw = ppu->oam.sprites[i].attr};
   uint16_t addr;
-  
-  if (!ppu->ctrl_sprite_size) {
-    if (attr.attr.flip_v) {
-      row = 7 - row;
-    }
-    addr = 0x1000 * ((uint16_t)ppu->ctrl_sprite_table) +
-           0x10 * ((uint16_t)tile) + ((uint16_t)row);
-  } else {
-    if (attr.attr.flip_v) {
-      row = 15 - row;
-    }
+
+  if (attr.attr.flip_v) {
+    row = (ppu->sprite_size - 1) - row;
+  }
+  if (ppu->ctrl_sprite_size) {
     oam_index_t tile_index = {.raw = tile};
+    bank = tile_index.index.bank;
     tile = tile_index.index.tile;
     if (row > 7) {
       tile++;
       row -= 8;
     }
-    addr = 0x1000 * ((uint16_t)tile_index.index.bank) +
-           0x10 * ((uint16_t)tile) + ((uint16_t)row);
   }
+  addr = 0x1000 * ((uint16_t)bank) + 0x10 * ((uint16_t)tile) + ((uint16_t)row);
   ppu->ren_bg_low = mmap(ppu, addr);
   ppu->ren_bg_high = mmap(ppu, addr + 8);
-  uint8_t a = attr.attr.palette << 2;
   uint32_t data = 0;
-  for (uint8_t i = 0; i < 8; i++) {
-    uint8_t p1 = 0;
-    uint8_t p2 = 0;
-    if (attr.attr.flip_h) {
-      p1 = (ppu->ren_bg_low & 1);
-      p2 = (ppu->ren_bg_high & 1) << 1;
-      ppu->ren_bg_low >>= 1;
-      ppu->ren_bg_high >>= 1;
-    } else {
-      p1 = (ppu->ren_bg_low & 0x80) >> 7;
-      p2 = (ppu->ren_bg_high & 0x80) >> 6;
-      ppu->ren_bg_low <<= 1;
-      ppu->ren_bg_high <<= 1;
+  if (attr.attr.flip_h) {
+    for (uint8_t i = 0; i < 8; i++) {
+      data <<= 4;
+      data |= ((ppu->ren_bg_low >> i) & 1);
+      data |= ((ppu->ren_bg_high >> i) & 1) << 1;
     }
-    data <<= 4;
-    data |= (uint32_t)(a | p1 | p2);
+  } else {
+    for (uint8_t i = 0; i < 8; i++) {
+      data <<= 4;
+      data |= ((ppu->ren_bg_low << i) & 0x80) >> 7;
+      data |= ((ppu->ren_bg_high << i) & 0x80) >> 6;
+    }
   }
+  data |= attr.attr.palette * 0x44444444;
   return data;
 }
 
@@ -181,6 +170,8 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
       ppu->ctrl_ppu_master = ppu->reg_ctrl.flags.ppu_master;
       ppu->ctrl_nmi = ppu->reg_ctrl.flags.nmi;
       // Update values
+      ppu->sprite_size = (ppu->ctrl_sprite_size ? 16 : 8);
+      ppu->increment = (ppu->ctrl_increment ? 32 : 1);
       ppu->t.nt_select.nt = ppu->ctrl_nametable;
       ppu->nmi_output = ppu->ctrl_nmi;
       break;
@@ -229,7 +220,7 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
       } else {
         mmap_ppu_write(ppu->mapper, ppu_addr, value);
       }
-      ppu->v.raw += (ppu->ctrl_increment ? 32 : 1);
+      ppu->v.raw += ppu->increment;
     } break;
   }
 }
@@ -275,7 +266,7 @@ uint8_t ppu_mem_read(ppu_t* ppu, uint16_t address, bool dummy) {
         ret = mmap_ppu_read(ppu->mapper, ppu->v.raw);
       }
       if (!dummy) {
-        ppu->v.raw += (ppu->ctrl_increment ? 32 : 1);
+        ppu->v.raw += ppu->increment;
       }
       return ret;
     }
@@ -340,7 +331,6 @@ void ppu_cycle(ppu_t* ppu) {
   bool cycle_pre = ppu->cycle >= 321 && ppu->cycle <= 336;
   bool cycle_visible = ppu->cycle >= 1 && ppu->cycle <= 256;
   bool cycle_fetch = cycle_pre || cycle_visible;
-  uint8_t sprite_size = (ppu->ctrl_sprite_size ? 16 : 8);
 
   ppu->oam_data_ff = false;
 
@@ -493,7 +483,7 @@ void ppu_cycle(ppu_t* ppu) {
             continue;
           }
           uint16_t row = ppu->scanline - y;
-          if (row >= sprite_size) {
+          if (row >= ppu->sprite_size) {
             continue;
           }
           if (ppu->spr_count < 8) {

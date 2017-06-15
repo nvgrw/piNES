@@ -326,6 +326,7 @@ static void flip(front_sdl_impl* impl) {
 
   PROFILER_POINT(END)
 
+#ifdef PROFILER
   // Display profiler data
   float* times = profiler_get_times();
   dest.x = 0;
@@ -339,6 +340,7 @@ static void flip(front_sdl_impl* impl) {
     SDL_RenderFillRect(impl->renderer, &dest);
     dest.x += dest.w;
   }
+#endif
 
   if (impl->front->scale != 1) {
     SDL_SetRenderTarget(impl->renderer, NULL);
