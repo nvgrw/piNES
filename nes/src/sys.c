@@ -6,6 +6,7 @@
 #include "controller.h"
 #include "cpu.h"
 #include "ppu.h"
+#include "profiler.h"
 #include "sys.h"
 
 /**
@@ -40,8 +41,10 @@ bool sys_run(sys* sys, uint32_t ms, void* context,
              apu_enqueue_audio_t enqueue_audio,
              apu_get_queue_size_t get_queue_size) {
   if (sys->running) {
+    PROFILER_POINT(SYS_START)
+
     sys->clock += ms;
-    while (sys->clock >= CLOCK_PERIOD && sys->running) {
+    while (sys->clock >= CLOCK_PERIOD) {
       cpu_nmi(sys->cpu, sys->ppu->nmi);
       if (cpu_cycle(sys->cpu)) {
         // Trapped, stop execution
@@ -59,12 +62,18 @@ bool sys_run(sys* sys, uint32_t ms, void* context,
         return true;
       }
 
+      PROFILER_POINT(SYS_CPU)
+
       ppu_cycle(sys->ppu);
 
       apu_cycle(sys->apu, context, enqueue_audio, get_queue_size);
 
+      PROFILER_POINT(SYS_PPU)
+
       sys->clock -= CLOCK_PERIOD;
     }
+
+    PROFILER_POINT(SYS_END)
 
     if (sys->ppu->flip) {
       controller_clear(sys->controller);
