@@ -48,18 +48,18 @@ static char* UNSUPPORTED_INSTRUCTION_MESSAGE =
 
 #ifdef PROFILER
 static uint8_t PROFILER_COLOURS[] = {
-    0xFF, 0xFF, 0xFF, // PROF_START - PROF_EVENTS
-    0xFF, 0xFF, 0xFF, // PROF_EVENTS - PROF_TICKS
-    0xFF, 0xFF, 0xFF, // PROF_TICKS - PROF_SYS_START
-    0xFF, 0x11, 0x11, // PROF_SYS_START - PROF_SYS_CPU
-    0x11, 0x11, 0x11, // PROF_SYS_CPU - PROF_SYS_PPU_BG
-    0x11, 0x11, 0xFF, // PROF_SYS_PPU_BG - PROF_SYS_PPU_SPRITES
-    0x11, 0xFF, 0x11, // PROF_SYS_PPU_SPRITES - PROF_SYS_PPU_LOGIC
-    0xFF, 0xFF, 0xFF, // PROF_SYS_PPU_LOGIC - PROF_SYS_APU
-    0xFF, 0xFF, 0xFF, // PROF_SYS_APU - PROF_SYS_END
-    0xFF, 0xFF, 0xFF, // PROF_SYS_END - PROF_PREFLIP
-    0xFF, 0xFF, 0xFF, // PROF_PREFLIP - PROF_END
-  };
+    0xFF, 0xFF, 0xFF,  // PROF_START - PROF_EVENTS
+    0xFF, 0xFF, 0xFF,  // PROF_EVENTS - PROF_TICKS
+    0xFF, 0xFF, 0xFF,  // PROF_TICKS - PROF_SYS_START
+    0xFF, 0x11, 0x11,  // PROF_SYS_START - PROF_SYS_CPU
+    0x11, 0x11, 0x11,  // PROF_SYS_CPU - PROF_SYS_PPU_BG
+    0x11, 0x11, 0xFF,  // PROF_SYS_PPU_BG - PROF_SYS_PPU_SPRITES
+    0x11, 0xFF, 0x11,  // PROF_SYS_PPU_SPRITES - PROF_SYS_PPU_LOGIC
+    0xFF, 0xFF, 0xFF,  // PROF_SYS_PPU_LOGIC - PROF_SYS_APU
+    0xFF, 0xFF, 0xFF,  // PROF_SYS_APU - PROF_SYS_END
+    0xFF, 0xFF, 0xFF,  // PROF_SYS_END - PROF_PREFLIP
+    0xFF, 0xFF, 0xFF,  // PROF_PREFLIP - PROF_END
+};
 #endif
 
 /**
@@ -454,8 +454,8 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
   // Initialise audio
   SDL_AudioSpec audio_want, audio_have;
   audio_want.freq = APU_ACTUAL_SAMPLE_RATE;
-  audio_want.format = AUDIO_S8;
-  audio_want.samples = 256;
+  audio_want.format = AUDIO_F32;
+  audio_want.samples = 8192;
   audio_want.callback = NULL;
   audio_want.channels = 1;
   audio_want.userdata = impl;

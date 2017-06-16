@@ -439,7 +439,7 @@ static apu_buffer_t apu_mix(apu_t* apu) {
   double pulse_out = apu->lookup_pulse_table[pulse1_out + pulse2_out];
   double tnd_out =
       apu->lookup_tnd_table[3 * triangle_out + 2 * noise_out + dmc_out];
-  return 255.0 * (pulse_out + tnd_out - 0.5);
+  return (pulse_out + tnd_out - 0.5);
 }
 
 // ----- REST -----
