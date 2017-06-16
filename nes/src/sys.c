@@ -90,6 +90,11 @@ bool sys_run(sys* sys, uint32_t ms, void* context,
 static void sys_reset(sys* sys) { cpu_reset(sys->cpu); }
 
 void sys_rom(sys* sys, char* path) {
+  if (sys->mapper != NULL) {
+    rom_destroy(sys->mapper);
+    sys->mapper = NULL;
+  }
+
   rom_error error = rom_load(&sys->mapper, path);
   switch (error) {
     case RE_SUCCESS:

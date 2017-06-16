@@ -7,7 +7,7 @@
  * bottleneck functions, CPU-intensive code, etc.
  */
 
-#define PROFILER 1
+// #define PROFILER 1
 
 typedef enum {
   PROF_START,   // front runloop start
@@ -19,9 +19,9 @@ typedef enum {
   PROF_SYS_PPU_SPRITES,
   PROF_SYS_PPU_LOGIC,
   PROF_SYS_APU,
-  PROF_SYS_END, // sys logic done
-  PROF_PREFLIP, // preflip done
-  PROF_END // flip (UI drawing) done
+  PROF_SYS_END,  // sys logic done
+  PROF_PREFLIP,  // preflip done
+  PROF_END       // flip (UI drawing) done
 } profiler_point_t;
 
 #ifdef PROFILER

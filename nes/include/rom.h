@@ -59,7 +59,7 @@ typedef struct __attribute__((packed)) {
   } flags7;
   union {
     struct {
-      uint8_t prg_ram_size;  // Specified in 8 KB units, 0 means CHR RAM used.
+      uint8_t prg_ram_size;  // Specified in 8 KB units, 0 means 8 KB used.
     } nes1;
     struct {
       uint8_t
