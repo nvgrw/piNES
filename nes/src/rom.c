@@ -282,6 +282,10 @@ bool rom_has_bus_conflicts(mapper* mapper) {
             #WHAT, WHERE, EXACTLY, WRITE ? "w" : "r");                      \
   } else
 
+#undef MEMACCESS_VALID
+#define MEMACCESS_VALID(WHAT, WHERE, EXACTLY, WRITE)                        \
+  if (mapper->mapped.WHAT != NULL)
+
 // Memory access functions
 void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {

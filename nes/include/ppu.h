@@ -176,7 +176,6 @@ typedef struct {
   uint8_t status_sprite0_hit;
 
   // Memory
-  uint8_t memory[PPU_MEMORY];
   mapper* mapper;
 
   // Status
@@ -185,6 +184,8 @@ typedef struct {
   bool frame_odd;
 
   // Special R/W conditions
+  uint8_t data_buf;
+  uint8_t last_reg_write;
   bool oam_data_ff;
 
   // Internal registers

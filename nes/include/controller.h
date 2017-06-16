@@ -9,6 +9,14 @@
  * and "drivers" to emulate them.
  */
 
+#if defined(IS_PI) && defined(TCP_HOST)
+#define NUM_CONTROLLER_DRIVERS 3
+#elif defined(IS_PI) || defined(TCP_HOST)
+#define NUM_CONTROLLER_DRIVERS 2
+#else
+#define NUM_CONTROLLER_DRIVERS 1
+#endif
+
 /**
  * This struct keeps track of which buttons are currently being pressed on
  * a controller.
@@ -98,12 +106,6 @@ void controller_deinit(controller_t* ctrl);
  */
 void controller_mem_write(controller_t* ctrl, uint16_t address, uint8_t value);
 uint8_t controller_mem_read(controller_t* ctrl, uint16_t address);
-
-#ifdef IS_PI
-#define NUM_CONTROLLER_DRIVERS 3
-#else
-#define NUM_CONTROLLER_DRIVERS 2
-#endif
 
 /**
  * Active controller drivers.

@@ -101,8 +101,9 @@ const controller_driver_t CONTROLLER_DRIVERS[NUM_CONTROLLER_DRIVERS] = {
     {.init = &controller_sdl_init,
      .poll = &controller_sdl_poll,
      .deinit = &controller_sdl_deinit},
-
+#ifdef TCP_HOST
     {.init = &controller_tcp_init,
      .poll = &controller_tcp_poll,
      .deinit = &controller_tcp_deinit},
+#endif
 };
