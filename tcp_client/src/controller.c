@@ -8,9 +8,20 @@
 
 #include <netdb.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+/**
+ * controller.c
+ *
+ * Used for interfacing with the NES controllers on the Raspberry Pi via the
+ * GPIO pins and the pigpio.h library. Sets up a TCP connection as a client with
+ * the emulator (the server) and continually transmits the status of the two
+ * controllers in two bytes. Should be compiled on a Raspberry Pi with
+ * pigpio.h installed.
+ */
 
 #define LATCH_DURATION 12                                        // us
 #define PULSE_HALF_CYCLE 6                                       // us
@@ -148,6 +159,10 @@ int main(int argc, char** argv) {
     error("ERROR connecting");
   }
   // Connection established
+
+  // Enable immediate flushing
+  int flag = 1;
+  setsockopt(sockfd, IPPROTO_TCP, TCP_NODELAY, (char*)&flag, sizeof(int));
   while (running) {
     poll_controllers();
     buffer[0] = cntrl_1.raw;
@@ -156,7 +171,6 @@ int main(int argc, char** argv) {
     if (n < 0) {
       error("ERROR writing to socket");
     }
-
     gpioDelay(LATCH_WAIT);
   }
 
