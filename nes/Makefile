@@ -5,12 +5,14 @@ SPC_BUILD_DIR = build
 SPC_BINARY = nes
 
 # library configuration
-SDL_CFLAGS ?= $(shell /DevProjects/Libs/SDL/bin/sdl2-config --cflags)
-SDL_LDFLAGS ?= $(shell /DevProjects/Libs/SDL/bin/sdl2-config --libs)
-SDL_IMAGE_CFLAGS ?= -I/DevProjects/Libs/SDL_image/include/SDL2
-SDL_IMAGE_LDFLAGS ?= -L/DevProjects/Libs/SDL_image/lib -lSDL2_image
-NFD_CFLAGS = -I/DevProjects/Libs/tpl/nativefiledialog/src/include
-NFD_LDFLAGS = -L/DevProjects/Libs/tpl/nativefiledialog/build/lib/Release/x64 -lnfd
+SDL_CFLAGS ?= $(shell sdl2-config --cflags)
+SDL_LDFLAGS ?= $(shell sdl2-config --libs)
+SDL_IMAGE_DIR ?= libs/SDL_image
+SDL_IMAGE_CFLAGS = -I$(SDL_IMAGE_DIR)/include/SDL2
+SDL_IMAGE_LDFLAGS = -L$(SDL_IMAGE_DIR)/lib -lSDL2_image
+NFD_DIR ?= libs/nativefiledialog
+NFD_CFLAGS = -I$(NFD_DIR)/src/include
+NFD_LDFLAGS = -L$(NFD_DIR)/build/lib/Release/x64 -lnfd
 
 # compiler configuration, may be overwritten with environment variables
 CC ?= gcc
