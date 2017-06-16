@@ -168,15 +168,19 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   ret->mapped.ppu_nametable1 = ret->mapped.ppu_nametable0 + MC_NAMETABLE_SIZE;
   // ret->mapped.ppu_palettes = ret->mapped.ppu_nametable1 + MC_NAMETABLE_SIZE;
 
-  if (rom_get_mapper_number(ret) != 0) {
+  uint32_t mapper_number = rom_get_mapper_number(ret);
+  if (mapper_number >= NUM_MAPPERS || !MAPPERS[mapper_number].present) {
     return RE_UNKNOWN_MAPPER;
   }
-  MAPPERS[rom_get_mapper_number(ret)].mapper_init(ret);
+
+  MAPPERS[mapper_number].mapper_init(MAPPERS + mapper_number, ret);
 
   return RE_SUCCESS;
 }
 
 void rom_destroy(mapper* mapper) {
+  uint32_t mapper_number = rom_get_mapper_number(mapper);
+  MAPPERS[mapper_number].mapper_deinit(MAPPERS + mapper_number, mapper);
   free(mapper->header);
   free(mapper->memory->prg_rom);
   free(mapper->memory->prg_ram);
@@ -307,7 +311,9 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
     }
   }
 
-  MAPPERS[rom_get_mapper_number(mapper)].cpu_write(mapper, address, val);
+  uint32_t mapper_number = rom_get_mapper_number(mapper);
+  MAPPERS[mapper_number].cpu_write(MAPPERS + mapper_number, mapper, address,
+                                   val);
 }
 
 uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
@@ -364,7 +370,9 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
     }
   }
 
-  return MAPPERS[rom_get_mapper_number(mapper)].cpu_read(mapper, address);
+  uint32_t mapper_number = rom_get_mapper_number(mapper);
+  return MAPPERS[mapper_number].cpu_read(MAPPERS + mapper_number, mapper,
+                                         address);
 }
 
 void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf) {
@@ -412,7 +420,9 @@ void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
     return;
   }
 
-  MAPPERS[rom_get_mapper_number(mapper)].ppu_write(mapper, address, val);
+  uint32_t mapper_number = rom_get_mapper_number(mapper);
+  MAPPERS[mapper_number].ppu_write(MAPPERS + mapper_number, mapper, address,
+                                   val);
 }
 
 uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
@@ -445,5 +455,7 @@ uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
     return nametable[address & 0x3FF];
   }
 
-  return MAPPERS[rom_get_mapper_number(mapper)].ppu_read(mapper, address);
+  uint32_t mapper_number = rom_get_mapper_number(mapper);
+  return MAPPERS[mapper_number].ppu_read(MAPPERS + mapper_number, mapper,
+                                         address);
 }
