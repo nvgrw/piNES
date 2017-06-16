@@ -24,6 +24,8 @@ This project is quite complex, but it can be separated into relatively well-isol
  - PPU - Picture Processing Unit - Handles blitting of tiles and sprites
  - IO - Input / Output - Emulator interface via GPIO pins
 
+Instructions for compilation of the extension can be found in `/extension/nes/README.md`.
+
 ## Branching model
 
 To make things easier for everyone, we use the git-flow-avh branching model. You can read about it [here](https://jeffkreeftmeijer.com/2010/why-arent-you-using-git-flow/).
