@@ -451,16 +451,6 @@ static void apu_write_to_buffer(apu_t* apu, apu_buffer_t value) {
 
 void apu_cycle(apu_t* apu, void* context, apu_enqueue_audio_t enqueue_audio,
                apu_get_queue_size_t get_queue_size) {
-  // This function is called at the rate of the PPU. Only do something useful
-  // every 3 cycles.
-
-  if (apu->cycle_count != 0) {
-    apu->cycle_count--;
-    return;
-  }
-
-  apu->cycle_count = 2;
-
   // Timer clock
   apu_timer_clock(apu);
   apu->is_even_cycle = !apu->is_even_cycle;

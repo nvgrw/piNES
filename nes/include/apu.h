@@ -162,7 +162,6 @@ typedef struct apu {
   mapper* mapper;
 
   // Outputting sound
-  uint8_t cycle_count;
   double sample_skips;
   apu_buffer_t buffer[AUDIO_BUFFER_SIZE];
   int buffer_cursor;

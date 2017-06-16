@@ -377,7 +377,7 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
 
 void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf) {
   uint16_t cur = address * 0x100;
-  ((cpu_t*)mapper->cpu)->busy += 513 * 3;
+  ((cpu_t*)mapper->cpu)->busy += 513; // TODO: odd cycles + 1
   for (uint16_t i = 0; i < 256; i++) {
     buf[i] = mmap_cpu_read(mapper, cur, false);
     cur++;
