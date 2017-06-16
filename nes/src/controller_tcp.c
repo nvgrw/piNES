@@ -18,7 +18,7 @@
  * controller_tcp.c
  */
 
-#define READLEN 2
+#define READLEN 1000
 
 static union {
   controller_pressed_t state;
