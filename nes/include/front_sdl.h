@@ -39,20 +39,20 @@ typedef struct {
   uint32_t message_ticks;
 
   // Common data
-  front* front;
-} front_sdl_impl;
+  front_t* front;
+} front_sdl_impl_t;
 
 /**
  * Creates an instance of an SDL front.
  */
-front_sdl_impl* front_sdl_impl_init();
+front_sdl_impl_t* front_sdl_impl_init();
 
 /**
  * Enters the main loop of the SDL front.
  */
-void front_sdl_impl_run(front_sdl_impl* front);
+void front_sdl_impl_run(front_sdl_impl_t* impl);
 
 /**
  * Frees any memory allocated with the SDL front, and quits SDL.
  */
-void front_sdl_impl_deinit(front_sdl_impl* front);
+void front_sdl_impl_deinit(front_sdl_impl_t* impl);

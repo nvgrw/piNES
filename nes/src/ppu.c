@@ -44,10 +44,11 @@ static uint32_t mmap(ppu_t* ppu, uint32_t address) {
   address &= 0x3FFF;
   if (address >= 0x3F00) {
     // Palette access
+    address -= 0x3F00;
     if (address % 4 == 0) {
       address &= 0x0F;
     }
-    return ppu->palette[address & 0x1F];
+    return ppu->palette[address & 0x1F] & 0x3F;
   }
   return mmap_ppu_read(ppu->mapper, address);
 }

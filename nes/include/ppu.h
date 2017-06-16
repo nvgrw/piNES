@@ -176,7 +176,7 @@ typedef struct {
   uint8_t status_sprite0_hit;
 
   // Memory
-  mapper* mapper;
+  mapper_t* mapper;
 
   // Status
   uint16_t cycle;

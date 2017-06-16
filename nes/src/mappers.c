@@ -5,7 +5,7 @@
 #define NROM128_SIZE 0x4000
 
 // Mapper 0
-static void mapper000_init(mapper_special* self, mapper* mapper) {
+static void mapper000_init(mapper_special_t* self, mapper_t* mapper) {
   size_t size = rom_get_prg_rom_size(mapper);
   if (size == NROM256_SIZE) {
     // NROM256 does not mirror (default).
@@ -17,20 +17,20 @@ static void mapper000_init(mapper_special* self, mapper* mapper) {
   }
 }
 
-static void mapper000_deinit(mapper_special* self, mapper* mapper) {}
+static void mapper000_deinit(mapper_special_t* self, mapper_t* mapper) {}
 
-static void mapper000_cpu_write(mapper_special* self, mapper* mapper,
+static void mapper000_cpu_write(mapper_special_t* self, mapper_t* mapper,
                                 uint16_t address, uint8_t val) {}
 
-static uint8_t mapper000_cpu_read(mapper_special* self, mapper* mapper,
+static uint8_t mapper000_cpu_read(mapper_special_t* self, mapper_t* mapper,
                                   uint16_t address) {
   return 0;
 }
 
-static void mapper000_ppu_write(mapper_special* self, mapper* mapper,
+static void mapper000_ppu_write(mapper_special_t* self, mapper_t* mapper,
                                 uint16_t address, uint8_t val) {}
 
-static uint8_t mapper000_ppu_read(mapper_special* self, mapper* mapper,
+static uint8_t mapper000_ppu_read(mapper_special_t* self, mapper_t* mapper,
                                   uint16_t address) {
   return 0;
 }
@@ -84,7 +84,7 @@ typedef struct {
   bool irq_enable;
 } mapper004_t;
 
-static void mapper004_init(mapper_special* self, mapper* mapper) {
+static void mapper004_init(mapper_special_t* self, mapper_t* mapper) {
   /**
    * PRG & CHR ROM and RAM are freed for us.
    * CHR ROM: 8K + 8K + 16K fixed.
@@ -103,12 +103,12 @@ static void mapper004_init(mapper_special* self, mapper* mapper) {
   self->data = data;
 }
 
-static void mapper004_deinit(mapper_special* self, mapper* mapper) {
+static void mapper004_deinit(mapper_special_t* self, mapper_t* mapper) {
   free(self->data);
   self->data = NULL;
 }
 
-static void mapper004_cpu_write(mapper_special* self, mapper* mapper,
+static void mapper004_cpu_write(mapper_special_t* self, mapper_t* mapper,
                                 uint16_t address, uint8_t val) {
   if (address >= 0x8000 && address <= 0x9FFF) {
     // Bank Select, $8000 - $9FFE (even)
@@ -148,15 +148,15 @@ static void mapper004_cpu_write(mapper_special* self, mapper* mapper,
   }
 }
 
-static uint8_t mapper004_cpu_read(mapper_special* self, mapper* mapper,
+static uint8_t mapper004_cpu_read(mapper_special_t* self, mapper_t* mapper,
                                   uint16_t address) {
   return 0;
 }
 
-static void mapper004_ppu_write(mapper_special* self, mapper* mapper,
+static void mapper004_ppu_write(mapper_special_t* self, mapper_t* mapper,
                                 uint16_t address, uint8_t val) {}
 
-static uint8_t mapper004_ppu_read(mapper_special* self, mapper* mapper,
+static uint8_t mapper004_ppu_read(mapper_special_t* self, mapper_t* mapper,
                                   uint16_t address) {
   return 0;
 }
@@ -176,5 +176,5 @@ static uint8_t mapper004_ppu_read(mapper_special* self, mapper* mapper,
     .ppu_write = NULL, .ppu_read = NULL, .present = false, .data = NULL \
   }
 
-mapper_special MAPPERS[NUM_MAPPERS] = {MAPPER(000), NOMAPPER, NOMAPPER,
-                                       NOMAPPER, MAPPER(004)};
+mapper_special_t MAPPERS[NUM_MAPPERS] = {MAPPER(000), NOMAPPER, NOMAPPER,
+                                         NOMAPPER, MAPPER(004)};

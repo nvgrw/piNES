@@ -13,29 +13,29 @@
  * sys.c
  */
 
-sys* sys_init(void) {
-  sys* ret = malloc(sizeof(sys));
-  ret->clock = 0.0;
-  ret->cpu = cpu_init();
-  ret->ppu = ppu_init();
-  ret->apu = apu_init();
-  ret->controller = controller_init();
-  ret->mapper = NULL;
+sys_t* sys_init(void) {
+  sys_t* sys = malloc(sizeof(sys_t));
+  sys->clock = 0.0;
+  sys->cpu = cpu_init();
+  sys->ppu = ppu_init();
+  sys->apu = apu_init();
+  sys->controller = controller_init();
+  sys->mapper = NULL;
 
-  ret->region = R_NTSC;
-  ret->status = SS_NONE;
-  ret->running = false;
+  sys->region = R_NTSC;
+  sys->status = SS_NONE;
+  sys->running = false;
   for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
     (*CONTROLLER_DRIVERS[i].init)();
   }
-  return ret;
+  return sys;
 }
 
 // TODO: move this to region
 #define CLOCKS_PER_MILLISECOND 21477.272
 #define CLOCK_PERIOD (12.0 / CLOCKS_PER_MILLISECOND)
 
-bool sys_run(sys* sys, uint32_t ms, void* context,
+bool sys_run(sys_t* sys, uint32_t ms, void* context,
              apu_enqueue_audio_t enqueue_audio,
              apu_get_queue_size_t get_queue_size) {
   if (sys->running) {
@@ -87,15 +87,15 @@ bool sys_run(sys* sys, uint32_t ms, void* context,
   return false;
 }
 
-static void sys_reset(sys* sys) { cpu_reset(sys->cpu); }
+static void sys_reset(sys_t* sys) { cpu_reset(sys->cpu); }
 
-void sys_rom(sys* sys, char* path) {
+void sys_rom(sys_t* sys, char* path) {
   if (sys->mapper != NULL) {
     rom_destroy(sys->mapper);
     sys->mapper = NULL;
   }
 
-  rom_error error = rom_load(&sys->mapper, path);
+  rom_error_t error = rom_load(&sys->mapper, path);
   switch (error) {
     case RE_SUCCESS:
       sys->status = SS_NONE;
@@ -124,7 +124,7 @@ void sys_rom(sys* sys, char* path) {
   }
 }
 
-void sys_start(sys* sys) {
+void sys_start(sys_t* sys) {
   if (sys->mapper == NULL) {
     sys->status = SS_ROM_MISSING;
     return;
@@ -132,14 +132,14 @@ void sys_start(sys* sys) {
   sys->running = true;
 }
 
-void sys_stop(sys* sys) {
+void sys_stop(sys_t* sys) {
   sys->running = false;
   sys_reset(sys);
 }
 
-void sys_pause(sys* sys) { sys->running = false; }
+void sys_pause(sys_t* sys) { sys->running = false; }
 
-void sys_step(sys* sys) {
+void sys_step(sys_t* sys) {
   if (sys->mapper == NULL) {
     sys->status = SS_ROM_MISSING;
     return;
@@ -147,7 +147,7 @@ void sys_step(sys* sys) {
   // stub
 }
 
-void sys_test(sys* sys) {
+void sys_test(sys_t* sys) {
   // TODO: make this work again
   FILE* fp = fopen("tests/6502_functional_test.bin", "r");
   fseek(fp, 0, SEEK_END);
@@ -159,7 +159,7 @@ void sys_test(sys* sys) {
   sys->running = true;
 }
 
-void sys_deinit(sys* sys) {
+void sys_deinit(sys_t* sys) {
   for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
     (*CONTROLLER_DRIVERS[i].deinit)();
   }

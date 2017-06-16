@@ -31,7 +31,7 @@ typedef enum {
   // CPU errors
   SS_CPU_TRAPPED,
   SS_CPU_UNSUPPORTED_INSTRUCTION
-} sys_status;
+} sys_status_t;
 
 /**
  * The main system struct, which holds all of the components.
@@ -41,58 +41,58 @@ typedef struct {
   controller_t* controller;
   cpu_t* cpu;
   ppu_t* ppu;
-  mapper* mapper;
+  mapper_t* mapper;
   apu_t* apu;
   region region;
 
-  sys_status status;
+  sys_status_t status;
   bool running;
-} sys;
+} sys_t;
 
 /**
  * Allocates memory for a system and initialises all of its components.
  */
-sys* sys_init(void);
+sys_t* sys_init(void);
 
 /**
  * Advances the clock of the system by the given number of milliseconds.
  * Returns true if the system stopped for any reason.
  */
-bool sys_run(sys* sys, uint32_t ms, void* context,
+bool sys_run(sys_t* sys, uint32_t ms, void* context,
              apu_enqueue_audio_t enqueue_audio,
              apu_get_queue_size_t get_queue_size);
 
 /**
  * Loads a ROM with the given path.
  */
-void sys_rom(sys* sys, char* path);
+void sys_rom(sys_t* sys, char* path);
 
 /**
  * Starts or resumes the system.
  */
-void sys_start(sys* sys);
+void sys_start(sys_t* sys);
 
 /**
  * Stops (and resets) the system.
  */
-void sys_stop(sys* sys);
+void sys_stop(sys_t* sys);
 
 /**
  * Pauses the system.
  */
-void sys_pause(sys* sys);
+void sys_pause(sys_t* sys);
 
 /**
  * Advances the system by one PPU cycle.
  */
-void sys_step(sys* sys);
+void sys_step(sys_t* sys);
 
 /**
  * Runs the tests binary on the system.
  */
-void sys_test(sys* sys);
+void sys_test(sys_t* sys);
 
 /**
  * Frees any dynamic memory allocated for the system.
  */
-void sys_deinit(sys* sys);
+void sys_deinit(sys_t* sys);

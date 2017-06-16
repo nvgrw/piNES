@@ -26,19 +26,19 @@ typedef enum {
   FT_IO,
   FT_MMC_CPU,
   FT_MMC_PPU
-} front_tab;
+} front_tab_t;
 
 /**
  * The front struct, common to all implementations.
  */
 typedef struct {
   // System
-  sys* sys;
+  sys_t* sys;
 
   // UI properties
-  front_tab tab;
+  front_tab_t tab;
   uint8_t scale;
-} front;
+} front_t;
 
 /**
  * Shows a system-dependent dialog to select a ROM file.
@@ -48,9 +48,9 @@ char* front_rom_dialog(void);
 /**
  * Allocates the memory for a front.
  */
-front* front_init(sys* sys);
+front_t* front_init(sys_t* sys);
 
 /**
  * Frees dynamic memory for a front.
  */
-void front_deinit(front* front);
+void front_deinit(front_t* front);

@@ -69,7 +69,7 @@ typedef struct {
    * TODO: NES Memory maps a lot of addresses, so once the CPU functional tests
    * pass, this needs to be revised
    */
-  mapper* mapper;
+  mapper_t* mapper;
   uint8_t* memory;
 
   struct jit_instruction* compiled;

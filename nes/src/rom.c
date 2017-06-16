@@ -72,7 +72,7 @@ int fread_all(FILE* fp, uint8_t* buf, size_t size) {
   return 0;
 }
 
-rom_error rom_load(mapper** mapper_ptr, const char* path) {
+rom_error_t rom_load(mapper_t** mapper_ptr, const char* path) {
   FILE* fp;
   if (!(fp = fopen(path, "r"))) {
     return RE_READ_ERROR;
@@ -96,10 +96,10 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   }
 
   // Allocate the mapper & assign it to the double pointer
-  mapper* ret = *mapper_ptr = malloc(sizeof(mapper));
+  mapper_t* ret = *mapper_ptr = malloc(sizeof(mapper_t));
 
   // Allocate the header
-  rom_header* header = malloc(sizeof(rom_header));
+  rom_header_t* header = malloc(sizeof(rom_header_t));
   // Populate the header
   memcpy(header, header_data + 4, HEADER_SIZE - 4);
 
@@ -107,7 +107,7 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   // - Archaic doesn't use bytes 8 - 15
   // - iNES doesn't use bytes 10 - 15
   //   Although flags 10 is an unofficial extension
-  rom_type type = ROMTYPE_ARCHAIC;
+  rom_type_t type = ROMTYPE_ARCHAIC;
   size_t prg_rom_size = header->prg_rom | header->flags9.nes2.prg_rom_additional
                                               << 4;
   if (header->flags7.data.ines_version == 2 &&
@@ -127,7 +127,7 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   }
 
   // Populate the memory struct
-  memory* mem = calloc(sizeof(memory), 1);
+  memory_t* mem = calloc(sizeof(memory_t), 1);
   ret->memory = mem;
   prg_rom_size = rom_get_prg_rom_size(ret);
 
@@ -178,7 +178,7 @@ rom_error rom_load(mapper** mapper_ptr, const char* path) {
   return RE_SUCCESS;
 }
 
-void rom_destroy(mapper* mapper) {
+void rom_destroy(mapper_t* mapper) {
   uint32_t mapper_number = rom_get_mapper_number(mapper);
   MAPPERS[mapper_number].mapper_deinit(MAPPERS + mapper_number, mapper);
   free(mapper->header);
@@ -191,7 +191,7 @@ void rom_destroy(mapper* mapper) {
 }
 
 // Utilities to query the header
-size_t rom_get_prg_rom_size(mapper* mappr) {
+size_t rom_get_prg_rom_size(mapper_t* mappr) {
   size_t size = mappr->header->prg_rom;
   if (mappr->type == ROMTYPE_NES2) {
     size |= ((size_t)mappr->header->flags9.nes2.prg_rom_additional) << 4;
@@ -200,7 +200,7 @@ size_t rom_get_prg_rom_size(mapper* mappr) {
   return size * 0x4000;  // 16 KB units
 }
 
-size_t rom_get_chr_rom_size(mapper* mappr) {
+size_t rom_get_chr_rom_size(mapper_t* mappr) {
   size_t size = mappr->header->chr_rom;
   if (mappr->type == ROMTYPE_NES2) {
     size |= ((size_t)mappr->header->flags9.nes2.chr_rom_additional) << 4;
@@ -209,7 +209,7 @@ size_t rom_get_chr_rom_size(mapper* mappr) {
   return size * 0x2000;  // 8 KB units
 }
 
-mirror_type rom_get_mirror_type(mapper* mapper) {
+mirror_type_t rom_get_mirror_type(mapper_t* mapper) {
   if (mapper->header->flags6.data.fs_vram) {
     return MIRRORTYPE_4SCREEN;
   }
@@ -218,7 +218,7 @@ mirror_type rom_get_mirror_type(mapper* mapper) {
                                                : MIRRORTYPE_HORIZONTAL;
 }
 
-uint32_t rom_get_mapper_number(mapper* mapper) {
+uint32_t rom_get_mapper_number(mapper_t* mapper) {
   // We don't currently support NES2.0 submappers
 
   uint32_t mapper_num = mapper->header->flags6.data.lower_mapper_num;
@@ -232,7 +232,7 @@ uint32_t rom_get_mapper_number(mapper* mapper) {
   return mapper_num;
 }
 
-video_mode rom_get_video_mode(mapper* mapper) {
+video_mode_t rom_get_video_mode(mapper_t* mapper) {
   if (mapper->type == ROMTYPE_NES2) {
     if (mapper->header->flags12.data.works_for_both) {
       return VMODE_UNIVERSAL;
@@ -261,11 +261,11 @@ video_mode rom_get_video_mode(mapper* mapper) {
   return VMODE_NTSC;
 }
 
-bool rom_has_persistent_memory(mapper* mapper) {
+bool rom_has_persistent_memory(mapper_t* mapper) {
   return mapper->header->flags6.data.has_persistent_memory;
 }
 
-bool rom_has_bus_conflicts(mapper* mapper) {
+bool rom_has_bus_conflicts(mapper_t* mapper) {
   if (mapper->type == ROMTYPE_INES) {
     return mapper->header->flags10.nes1.bus_conflicts;
   }
@@ -287,7 +287,7 @@ bool rom_has_bus_conflicts(mapper* mapper) {
   if (mapper->mapped.WHAT != NULL)
 
 // Memory access functions
-void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
+void mmap_cpu_write(mapper_t* mapper, uint16_t address, uint8_t val) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
     MEMACCESS_VALID(ram, (address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE, address,
                     true) {
@@ -320,7 +320,7 @@ void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val) {
                                    val);
 }
 
-uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
+uint8_t mmap_cpu_read(mapper_t* mapper, uint16_t address, bool dummy) {
   if (address >= MC_WORK_RAM_BASE && address < MC_WORK_RAM_UPPER) {
     MEMACCESS_VALID(ram, address - MC_WORK_RAM_BASE, address, false) {
       return mapper->mapped.ram[(address - MC_WORK_RAM_BASE) % WORK_RAM_SIZE];
@@ -379,7 +379,7 @@ uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy) {
                                          address);
 }
 
-void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf) {
+void mmap_cpu_dma(mapper_t* mapper, uint8_t address, uint8_t* buf) {
   uint16_t cur = address * 0x100;
   ((cpu_t*)mapper->cpu)->busy += 513; // TODO: odd cycles + 1
   for (uint16_t i = 0; i < 256; i++) {
@@ -388,7 +388,7 @@ void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf) {
   }
 }
 
-void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
+void mmap_ppu_write(mapper_t* mapper, uint16_t address, uint8_t val) {
   if (address >= 0x3000 && address < 0x3000 + 0xF00) {
     address -= 0x1000;
   }
@@ -410,7 +410,7 @@ void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
 
   // Nametable
   if (address >= MC_NAMETABLE0_BASE && address < MC_NAMETABLE3_UPPER) {
-    mirror_type mt = rom_get_mirror_type(mapper);
+    mirror_type_t mt = rom_get_mirror_type(mapper);
     uint8_t* nametable = mapper->mapped.ppu_nametable0;
     if (address < MC_NAMETABLE1_UPPER && mt == MIRRORTYPE_VERTICAL) {
       nametable = mapper->mapped.ppu_nametable1;
@@ -429,7 +429,7 @@ void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val) {
                                    val);
 }
 
-uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
+uint8_t mmap_ppu_read(mapper_t* mapper, uint16_t address) {
   if (address >= 0x3000 && address < 0x3000 + 0xF00) {
     address -= 0x1000;
   }
@@ -446,7 +446,7 @@ uint8_t mmap_ppu_read(mapper* mapper, uint16_t address) {
 
   // Nametable
   if (address >= MC_NAMETABLE0_BASE && address < MC_NAMETABLE3_UPPER) {
-    mirror_type mt = rom_get_mirror_type(mapper);
+    mirror_type_t mt = rom_get_mirror_type(mapper);
     uint8_t* nametable = mapper->mapped.ppu_nametable0;
     if (address < MC_NAMETABLE1_UPPER && mt == MIRRORTYPE_VERTICAL) {
       nametable = mapper->mapped.ppu_nametable1;
