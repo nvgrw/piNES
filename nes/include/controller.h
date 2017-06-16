@@ -54,7 +54,7 @@ typedef enum {
 /**
  * This holds the status and pressed buttons data for both of the controllers.
  */
-typedef struct {
+typedef struct controller {
   controller_status_t status1;
   controller_pressed_t pressed1;
   controller_status_t status2;

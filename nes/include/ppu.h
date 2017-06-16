@@ -106,7 +106,7 @@ typedef struct __attribute__((packed)) {
 /**
  * The main PPU struct. Holds internal state, memory, and registers.
  */
-typedef struct {
+typedef struct ppu {
   // Register PPUCTRL
   union {
     struct __attribute__((packed)) {

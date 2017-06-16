@@ -134,6 +134,11 @@ typedef struct {
   uint8_t* chr_ram;  // NULL if not present
 } memory_t;
 
+struct controller;
+struct cpu;
+struct ppu;
+struct apu;
+
 typedef struct {
   rom_header_t* header;
   rom_type_t type;
@@ -156,10 +161,10 @@ typedef struct {
     // uint8_t* ppu_palettes;
   } mapped;
 
-  void* controller;
-  void* cpu;
-  void* ppu;
-  void* apu;
+  struct controller* controller;
+  struct cpu* cpu;
+  struct ppu* ppu;
+  struct apu* apu;
 } mapper_t;
 
 /*
