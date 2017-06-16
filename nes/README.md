@@ -22,7 +22,9 @@ There is a Makefile included with the project, although it is currently mostly O
 
 After compilation, the emulator needs to be invoked from the `nes` directory. For example:
 
-`build/nes`
+```
+build/nes
+```
 
 This enables it to find `assets/pines.png`.
 
