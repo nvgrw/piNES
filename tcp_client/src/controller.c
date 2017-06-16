@@ -1,28 +1,26 @@
-#include <stdio.h>
-#include <stdint.h>
 #include <pigpio.h>
-#include <stdbool.h>
-#include <stdlib.h>
 #include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include <unistd.h>
+#include <netdb.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <netinet/in.h>
-#include <netdb.h>
+#include <unistd.h>
 
-#define LATCH_DURATION 12 // us
-#define PULSE_HALF_CYCLE 6 // us
-#define LATCH_WAIT 1667 - LATCH_DURATION - PULSE_HALF_CYCLE * 8 // us
+#define LATCH_DURATION 12                                        // us
+#define PULSE_HALF_CYCLE 6                                       // us
+#define LATCH_WAIT 1667 - LATCH_DURATION - PULSE_HALF_CYCLE * 8  // us
 
 #define PORT_NO 51717
 
 static volatile bool running = true;
 
-void sigIntHandler(int a) {
-  running = false;
-}
+void sigIntHandler(int a) { running = false; }
 
 void pulse() {
   gpioWrite(27, 1);
@@ -45,63 +43,62 @@ static union {
 } cntrl_1, cntrl_2;
 
 void poll_controllers(void) {
-  
   // Set latch for 12us
   gpioWrite(18, 1);
   gpioDelay(LATCH_DURATION);
   gpioWrite(18, 0);
-  
+
   // Poll A
-  cntrl_1.data.a = !gpioRead(17); 
-  cntrl_2.data.a = !gpioRead(22); 
+  cntrl_1.data.a = !gpioRead(17);
+  cntrl_2.data.a = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll B
   pulse();
   cntrl_1.data.b = !gpioRead(17);
-  cntrl_2.data.b = !gpioRead(22); 
+  cntrl_2.data.b = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll SELECT
   pulse();
   cntrl_1.data.select = !gpioRead(17);
-  cntrl_2.data.select = !gpioRead(22); 
+  cntrl_2.data.select = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll START
   pulse();
   cntrl_1.data.start = !gpioRead(17);
-  cntrl_2.data.start = !gpioRead(22); 
+  cntrl_2.data.start = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll UP
   pulse();
   cntrl_1.data.up = !gpioRead(17);
-  cntrl_2.data.up = !gpioRead(22); 
+  cntrl_2.data.up = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll DOWN
   pulse();
   cntrl_1.data.down = !gpioRead(17);
-  cntrl_2.data.down = !gpioRead(22); 
+  cntrl_2.data.down = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll LEFT
   pulse();
   cntrl_1.data.left = !gpioRead(17);
-  cntrl_2.data.left = !gpioRead(22); 
+  cntrl_2.data.left = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
 
   // Poll RIGHT
   pulse();
   cntrl_1.data.right = !gpioRead(17);
-  cntrl_2.data.right = !gpioRead(22); 
+  cntrl_2.data.right = !gpioRead(22);
   gpioDelay(PULSE_HALF_CYCLE);
 }
 
 void init_controller(void) {
-  if (gpioInitialise() < 0) exit(1); 
- 
+  if (gpioInitialise() < 0) exit(1);
+
   // Pin 17: cntrl_1 data
   gpioSetMode(17, PI_INPUT);
   // Pin 22: cntrl_2 data
@@ -113,9 +110,7 @@ void init_controller(void) {
   gpioSetMode(27, PI_OUTPUT);
 }
 
-void deinit_controller(void) {
-  gpioTerminate();
-}
+void deinit_controller(void) { gpioTerminate(); }
 
 void error(const char* message) {
   perror(message);
@@ -127,7 +122,7 @@ static uint8_t buffer[2] = {0, 0};
 int main(int argc, char** argv) {
   init_controller();
   gpioSetSignalFunc(SIGINT, sigIntHandler);
-  
+
   int sockfd, n;
   struct sockaddr_in serv_addr;
   struct hostent* server;
@@ -144,11 +139,12 @@ int main(int argc, char** argv) {
   if (server == NULL) {
     error("ERROR: no such host");
   }
-  memset((char*) &serv_addr, 0, sizeof(serv_addr));
+  memset((char*)&serv_addr, 0, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
-  memcpy((char*) &serv_addr.sin_addr.s_addr, (char*) server->h_addr, server->h_length);
+  memcpy((char*)&serv_addr.sin_addr.s_addr, (char*)server->h_addr,
+         server->h_length);
   serv_addr.sin_port = htons(PORT_NO);
-  if (connect(sockfd, (struct sockaddr*) &serv_addr, sizeof(serv_addr)) < 0) {
+  if (connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
     error("ERROR connecting");
   }
   // Connection established
@@ -168,5 +164,3 @@ int main(int argc, char** argv) {
   deinit_controller();
   return EXIT_SUCCESS;
 }
-
-

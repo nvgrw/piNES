@@ -18,6 +18,8 @@
  * controller_tcp.c
  */
 
+#define READLEN 1000
+
 static union {
   controller_pressed_t state;
   uint8_t raw;
@@ -34,8 +36,8 @@ static struct {
   struct sockaddr_in cli_addr;
 } tcp;
 
-bool has_client = false;
-static uint8_t buffer[2] = {0, 0};
+static bool has_client = false;
+static uint8_t buffer[READLEN];  // Zeroed out as part of BSS.
 
 int controller_tcp_init(void) {
   // Initialise socket
@@ -79,7 +81,7 @@ void controller_tcp_poll(controller_t* ctrl) {
     // Connection established with client
     has_client = true;
   }
-  n = read(tcp.newsockfd, buffer, 1000);
+  n = read(tcp.newsockfd, buffer, READLEN);
   if (n >= 2) {
     ctrl_1.raw = buffer[0];
     ctrl_2.raw = buffer[1];
