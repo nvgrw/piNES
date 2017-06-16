@@ -455,15 +455,18 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
   SDL_AudioSpec audio_want, audio_have;
   audio_want.freq = APU_ACTUAL_SAMPLE_RATE;
   audio_want.format = AUDIO_F32;
-  audio_want.samples = 8192;
+  audio_want.samples = AUDIO_BUFFER_SIZE;
   audio_want.callback = NULL;
   audio_want.channels = 1;
   audio_want.userdata = impl;
-
-  if ((impl->audio_device = SDL_OpenAudioDevice(
-           NULL, 0, &audio_want, &audio_have, SDL_AUDIO_ALLOW_FORMAT_CHANGE)) ==
-      0) {
+  impl->audio_device = 
+      SDL_OpenAudioDevice(NULL, 0, &audio_want, &audio_have, 0);
+  if (!impl->audio_device) {
     fprintf(stderr, "Could not create audio device, %s\n", SDL_GetError());
+    SDL_DestroyTexture(impl->screen_tex);
+    SDL_DestroyTexture(impl->ui);
+    SDL_DestroyRenderer(impl->renderer);
+    SDL_DestroyWindow(impl->window);
     free(impl);
     return NULL;
   }
@@ -664,7 +667,8 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
 static void front_sdl_impl_audio_enqueue(void* context, apu_buffer_t* buffer,
                                          int len) {
   front_sdl_impl_t* impl = (front_sdl_impl_t*)context;
-  SDL_QueueAudio(impl->audio_device, buffer, len);
+  //SDL_ClearQueuedAudio(impl->audio_device);
+  SDL_QueueAudio(impl->audio_device, buffer, len * sizeof(apu_buffer_t));
 }
 
 static apu_queued_size_t front_sdl_impl_audio_get_queue_size(void* context) {

@@ -163,7 +163,7 @@ typedef struct apu {
 
   // Outputting sound
   double sample_skips;
-  apu_buffer_t buffer[AUDIO_BUFFER_SIZE];
+  apu_buffer_t* buffer;
   int buffer_cursor;
   bool is_even_cycle;
 

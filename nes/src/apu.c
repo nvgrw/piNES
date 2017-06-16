@@ -6,6 +6,13 @@
 
 apu_t* apu_init(void) {
   apu_t* apu = calloc(1, sizeof(apu_t));
+  apu->sample_skips = 0.0;
+  apu->buffer = malloc(AUDIO_BUFFER_SIZE * sizeof(apu_buffer_t));
+  for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
+    apu->buffer[i] = 0.0;
+  }
+  apu->buffer_cursor = 0;
+  apu->is_even_cycle = false;
 
   // Set up shift register
   apu->channel_noise.shift_register = 1;
@@ -439,14 +446,15 @@ static apu_buffer_t apu_mix(apu_t* apu) {
   double pulse_out = apu->lookup_pulse_table[pulse1_out + pulse2_out];
   double tnd_out =
       apu->lookup_tnd_table[3 * triangle_out + 2 * noise_out + dmc_out];
-  return (pulse_out + tnd_out - 0.5);
+  return (float)(pulse_out + tnd_out);
 }
 
 // ----- REST -----
 static void apu_write_to_buffer(apu_t* apu, apu_buffer_t value) {
+  //printf("v: %f\n", value);
   apu->buffer[apu->buffer_cursor] = value;
   apu->buffer_cursor++;
-  apu->buffer_cursor = apu->buffer_cursor % AUDIO_BUFFER_SIZE;
+  apu->buffer_cursor %= AUDIO_BUFFER_SIZE;
 }
 
 void apu_cycle(apu_t* apu, void* context, apu_enqueue_audio_t enqueue_audio,
@@ -458,10 +466,9 @@ void apu_cycle(apu_t* apu, void* context, apu_enqueue_audio_t enqueue_audio,
   // Frame counter
   apu_frame_counter_clock(apu);
 
-  // Skip samples/ downsample
+  // Skip samples / downsample
   if (apu->sample_skips <= 0.0) {
     apu_write_to_buffer(apu, apu_mix(apu));
-
     if (apu->buffer_cursor == 0) {
       enqueue_audio(context, apu->buffer, AUDIO_BUFFER_SIZE);
     }
