@@ -82,7 +82,7 @@ static uint8_t PROFILER_COLOURS[] = {
  *   Updates the window with the current screen data, and draws any UI
  *   on top of the screen as necessary.
  */
-static void display_number(front_sdl_impl* impl, uint32_t num, uint16_t x,
+static void display_number(front_sdl_impl_t* impl, uint32_t num, uint16_t x,
                            uint16_t y) {
   SDL_Rect src = {.x = 144, .y = 0, .w = 8, .h = 8};
   SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
@@ -105,7 +105,7 @@ static void display_number(front_sdl_impl* impl, uint32_t num, uint16_t x,
   }
 }
 
-static void display_text(front_sdl_impl* impl, char* str, uint16_t x,
+static void display_text(front_sdl_impl_t* impl, char* str, uint16_t x,
                          uint16_t y) {
   SDL_Rect src = {.x = 0, .y = 0, .w = 8, .h = 8};
   SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
@@ -126,7 +126,7 @@ static void display_text(front_sdl_impl* impl, char* str, uint16_t x,
   }
 }
 
-static void display_message(front_sdl_impl* impl, char* str) {
+static void display_message(front_sdl_impl_t* impl, char* str) {
   size_t len = strlen(str);
   if (len > 511) {
     len = 511;
@@ -136,7 +136,7 @@ static void display_message(front_sdl_impl* impl, char* str) {
   impl->message_ticks = 2000;
 }
 
-static void preflip(front_sdl_impl* impl) {
+static void preflip(front_sdl_impl_t* impl) {
   if (impl->front->scale != 1) {
     // If there is a scaling factor, we render everything to a texture first
     SDL_SetRenderTarget(impl->renderer, impl->prescaled_tex);
@@ -151,12 +151,12 @@ static void preflip(front_sdl_impl* impl) {
   PROFILER_POINT(PREFLIP)
 }
 
-static void flip(front_sdl_impl* impl) {
+static void flip(front_sdl_impl_t* impl) {
   SDL_Rect src;
   SDL_Rect dest;
 
-  sys* sys = impl->front->sys;
-  mapper* mapper = sys->mapper;
+  sys_t* sys = impl->front->sys;
+  mapper_t* mapper = sys->mapper;
   uint16_t pc = sys->cpu->program_counter;
   switch (impl->front->tab) {
     case FT_PPU: {
@@ -358,7 +358,7 @@ static void flip(front_sdl_impl* impl) {
  *
  * See front_sdl.h for descriptions.
  */
-front_sdl_impl* front_sdl_impl_init(front* front) {
+front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
   // Initialise SDL and SDL_image
   if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
     fprintf(stderr, "Could not initialise SDL\n");
@@ -377,7 +377,7 @@ front_sdl_impl* front_sdl_impl_init(front* front) {
   }
 
   // Initialise front implementation struct
-  front_sdl_impl* impl = calloc(1, sizeof(front_sdl_impl));
+  front_sdl_impl_t* impl = calloc(1, sizeof(front_sdl_impl_t));
   impl->mouse_x = -1;
   impl->mouse_y = -1;
   impl->mouse_down = false;
@@ -480,11 +480,11 @@ static void front_sdl_impl_audio_enqueue(void* context, apu_buffer_t* buffer,
                                          int len);
 static apu_queued_size_t front_sdl_impl_audio_get_queue_size(void* context);
 
-void front_sdl_impl_run(front_sdl_impl* impl) {
+void front_sdl_impl_run(front_sdl_impl_t* impl) {
   bool running = true;
   bool force_flip = false;
   uint32_t last_tick = SDL_GetTicks();
-  sys* sys = impl->front->sys;
+  sys_t* sys = impl->front->sys;
 
   // Enter render loop, waiting for user to quit
   while (running) {
@@ -663,16 +663,16 @@ void front_sdl_impl_run(front_sdl_impl* impl) {
 
 static void front_sdl_impl_audio_enqueue(void* context, apu_buffer_t* buffer,
                                          int len) {
-  front_sdl_impl* impl = (front_sdl_impl*)context;
+  front_sdl_impl_t* impl = (front_sdl_impl_t*)context;
   SDL_QueueAudio(impl->audio_device, buffer, len);
 }
 
 static apu_queued_size_t front_sdl_impl_audio_get_queue_size(void* context) {
-  front_sdl_impl* impl = (front_sdl_impl*)context;
+  front_sdl_impl_t* impl = (front_sdl_impl_t*)context;
   return SDL_GetQueuedAudioSize(impl->audio_device);
 }
 
-void front_sdl_impl_deinit(front_sdl_impl* impl) {
+void front_sdl_impl_deinit(front_sdl_impl_t* impl) {
   SDL_DestroyTexture(impl->screen_tex);
   SDL_DestroyTexture(impl->ui);
   SDL_DestroyRenderer(impl->renderer);

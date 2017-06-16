@@ -159,7 +159,7 @@ typedef union {
 } apu_register_4017_frame_counter_t;
 
 typedef struct apu {
-  mapper* mapper;
+  mapper_t* mapper;
 
   // Outputting sound
   double sample_skips;

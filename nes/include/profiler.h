@@ -5,10 +5,13 @@
  *
  * Functions and macros to allow profiling the emulator in realtime to find
  * bottleneck functions, CPU-intensive code, etc.
+ *
+ * Enabled with -DPROFILER
  */
 
-// #define PROFILER 1
-
+/**
+ * Points of interest within the program.
+ */
 typedef enum {
   PROF_START,   // front runloop start
   PROF_EVENTS,  // SDL events polled and done
@@ -30,9 +33,7 @@ typedef enum {
 void profiler_set_point(profiler_point_t p);
 #else
 #define PROFILER_NUM_POINTS 0
-#define PROFILER_POINT(P) \
-  do {                    \
-  } while (0);
+#define PROFILER_POINT(P)
 #endif
 
 float* profiler_get_times();

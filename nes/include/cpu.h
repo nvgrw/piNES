@@ -36,7 +36,7 @@ struct jit_instruction;
  *
  * http://nesdev.com/6502.txt
  */
-typedef struct {
+typedef struct cpu {
   // Registers
   uint8_t register_a;  // Accumulation Register
   uint8_t register_x;  // Register X
@@ -69,7 +69,7 @@ typedef struct {
    * TODO: NES Memory maps a lot of addresses, so once the CPU functional tests
    * pass, this needs to be revised
    */
-  mapper* mapper;
+  mapper_t* mapper;
   uint8_t* memory;
 
   struct jit_instruction* compiled;

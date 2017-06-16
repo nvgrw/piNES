@@ -44,10 +44,11 @@ static uint32_t mmap(ppu_t* ppu, uint32_t address) {
   address &= 0x3FFF;
   if (address >= 0x3F00) {
     // Palette access
+    address -= 0x3F00;
     if (address % 4 == 0) {
       address &= 0x0F;
     }
-    return ppu->palette[address & 0x1F];
+    return ppu->palette[address & 0x1F] & 0x3F;
   }
   return mmap_ppu_read(ppu->mapper, address);
 }
@@ -213,6 +214,7 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
     case PPU_ADDR_PPUDATA: { // 7
       uint16_t ppu_addr = ppu->v.raw & 0x3FFF;
       if (ppu_addr >= 0x3F00) {
+        ppu_addr -= 0x3F00;
         if (ppu_addr % 4 == 0) {
           ppu_addr &= 0x0F;
         }
@@ -222,7 +224,10 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
       }
       ppu->v.raw += ppu->increment;
     } break;
+    default:
+      return;
   }
+  ppu->last_reg_write = value;
 }
 
 uint8_t ppu_mem_read(ppu_t* ppu, uint16_t address, bool dummy) {
@@ -237,7 +242,7 @@ uint8_t ppu_mem_read(ppu_t* ppu, uint16_t address, bool dummy) {
   switch (address) {
     case PPU_ADDR_PPUSTATUS: { // 2
       // Encode register
-      ppu->reg_status.flags.last_write = ppu->status_last_write;
+      ppu->reg_status.flags.last_write = ppu->last_reg_write;
       ppu->reg_status.flags.overflow = ppu->status_overflow;
       ppu->reg_status.flags.sprite0_hit = ppu->status_sprite0_hit;
       ppu->reg_status.flags.vblank = ppu->nmi_occurred;
@@ -258,14 +263,16 @@ uint8_t ppu_mem_read(ppu_t* ppu, uint16_t address, bool dummy) {
       uint16_t ppu_addr = ppu->v.raw & 0x3FFF;
       uint8_t ret = 0;
       if (ppu_addr >= 0x3F00) {
+        ppu_addr -= 0x3F00;
         if (ppu_addr % 4 == 0) {
           ppu_addr &= 0x0F;
         }
         ret = ppu->palette[ppu_addr & 0x1F];
       } else {
-        ret = mmap_ppu_read(ppu->mapper, ppu->v.raw);
+        ret = ppu->data_buf;
       }
       if (!dummy) {
+        ppu->data_buf = mmap_ppu_read(ppu->mapper, ppu->v.raw);
         ppu->v.raw += ppu->increment;
       }
       return ret;
@@ -304,6 +311,7 @@ void ppu_power(ppu_t* ppu) {
   // http://wiki.nesdev.com/w/index.php/PPU_power_up_state
   ppu_reset(ppu);
   ppu->reg_status.raw = 0xA0;
+  ppu->data_buf = 0;
   ppu->oam_address = 0;
   // ppu->v.raw = 0;
   ppu->t.raw = 0;
@@ -341,6 +349,7 @@ void ppu_cycle(ppu_t* ppu) {
       uint8_t pixel = 0;
 
       bool edge = (ppu->cycle < 8 || (ppu->cycle >= 248 && ppu->cycle < 256));
+      bool edge_masked = edge || (!ppu->mask_show_left_bg || !ppu->mask_show_left_sprites);
       bool show_bg_e = show_bg && (!edge || ppu->mask_show_left_bg);
       bool show_sprites_e = show_sprites && (!edge || ppu->mask_show_left_sprites);
 
@@ -372,7 +381,8 @@ void ppu_cycle(ppu_t* ppu) {
         }
         if (spr_found != 0xFF) {
           // Register sprite-0 hit if applicable
-          if (cycle_visible && pixel && ppu->spr_index[spr_found] == 0) {
+          if (cycle_visible && pixel && ppu->spr_index[spr_found] == 0 &&
+              !edge_masked && ppu->cycle != 255 && spr_pixel) {
             ppu->status_sprite0_hit = true;
           }
           // Render the pixel unless behind-background placement wanted
@@ -385,13 +395,12 @@ void ppu_cycle(ppu_t* ppu) {
       // PROFILER_POINT(SYS_PPU_SPRITES)
 
       // Apply the palette
-      pixel = ppu->palette[pixel & 0x1F] &
-              (ppu->mask_gray ? 0x30 : 0x3F);
+      pixel = ppu->palette[pixel] & (ppu->mask_gray ? 0x30 : 0x3F);
 
       // Use the current driver to render the pixel
       switch (ppu->driver) {
         case PPUD_DIRECT:
-          ppu->screen[ppu->cycle + ppu->scanline * 256] = pixel & 0x1F;
+          ppu->screen[ppu->cycle - 1 + ppu->scanline * 256] = pixel & 0x3F;
           // Emphasis | (reg.EmpRGB << 6);
           break;
         case PPUD_SIGNAL:

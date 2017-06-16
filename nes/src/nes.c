@@ -42,10 +42,10 @@ int main(int argc, char** argv) {
   }
 
   // Initialise the system
-  sys* sys = sys_init();
+  sys_t* sys = sys_init();
 
   // Initialise the front
-  front* front = front_init(sys);
+  front_t* front = front_init(sys);
   if (front == NULL) {
     fprintf(stderr, "Could not initialise front\n");
     sys_deinit(sys);
@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
   }
 
   // Initialise the front implementation
-  front_impl* impl = front_impl_init(front);
+  front_impl_t* impl = front_impl_init(front);
   if (impl == NULL) {
     fprintf(stderr, "Could not initialise front implementation\n");
     front_deinit(front);

@@ -19,17 +19,17 @@ typedef enum {
   RE_PRG_READ_ERROR,
   RE_CHR_READ_ERROR,
   RE_UNKNOWN_MAPPER
-} rom_error;
+} rom_error_t;
 
-typedef enum { ROMTYPE_ARCHAIC, ROMTYPE_INES, ROMTYPE_NES2 } rom_type;
+typedef enum { ROMTYPE_ARCHAIC, ROMTYPE_INES, ROMTYPE_NES2 } rom_type_t;
 
 typedef enum {
   MIRRORTYPE_HORIZONTAL,
   MIRRORTYPE_VERTICAL,
   MIRRORTYPE_4SCREEN
-} mirror_type;
+} mirror_type_t;
 
-typedef enum { VMODE_NTSC, VMODE_PAL, VMODE_UNIVERSAL } video_mode;
+typedef enum { VMODE_NTSC, VMODE_PAL, VMODE_UNIVERSAL } video_mode_t;
 
 // Referenced from here:
 // https://wiki.nesdev.com/w/index.php/INES#iNES_file_format
@@ -118,7 +118,7 @@ typedef struct __attribute__((packed)) {
   } flags13;
   uint8_t : 8;
   uint8_t : 8;
-} rom_header;
+} rom_header_t;
 
 // https://en.wikibooks.org/wiki/NES_Programming/Memory_Map
 typedef struct {
@@ -132,13 +132,18 @@ typedef struct {
   uint8_t vram[VIDEO_RAM_SIZE];
   uint8_t* chr_rom;  // NULL if not present
   uint8_t* chr_ram;  // NULL if not present
-} memory;
+} memory_t;
+
+struct controller;
+struct cpu;
+struct ppu;
+struct apu;
 
 typedef struct {
-  rom_header* header;
-  rom_type type;
+  rom_header_t* header;
+  rom_type_t type;
   // Actual struct storing the data
-  memory* memory;
+  memory_t* memory;
   // An indirection struct which the mapper manipulates e.g. for bank switching
   struct {
     uint8_t* ram;
@@ -156,11 +161,11 @@ typedef struct {
     // uint8_t* ppu_palettes;
   } mapped;
 
-  void* controller;
-  void* cpu;
-  void* ppu;
-  void* apu;
-} mapper;
+  struct controller* controller;
+  struct cpu* cpu;
+  struct ppu* ppu;
+  struct apu* apu;
+} mapper_t;
 
 /*
  * Load a rom and return a pointer to its mapper.
@@ -168,51 +173,51 @@ typedef struct {
  * The pointer is allocated by the method.
  * Please call rom_destroy, passing the mapper pointer, once you are done.
  */
-rom_error rom_load(mapper** mapper, const char* path);
+rom_error_t rom_load(mapper_t** mapper, const char* path);
 
-void rom_destroy(mapper* mapper);
+void rom_destroy(mapper_t* mapper);
 
 // Utilities to query the header
 /**
  * Get the PRG ROM size in bytes
  */
-size_t rom_get_prg_rom_size(mapper* mappr);
+size_t rom_get_prg_rom_size(mapper_t* mapper);
 
 /**
  * Get the CHR ROM size in bytes
  */
-size_t rom_get_chr_rom_size(mapper* mappr);
+size_t rom_get_chr_rom_size(mapper_t* mapper);
 
 /**
  * Get ROM mirroring type
  */
-mirror_type rom_get_mirror_type(mapper* mapper);
+mirror_type_t rom_get_mirror_type(mapper_t* mapper);
 
 /**
  * Get ROM mapper number
  */
-uint32_t rom_get_mapper_number(mapper* mapper);
+uint32_t rom_get_mapper_number(mapper_t* mapper);
 
 /**
  * Get video mode
  * This was only added reliably to the NES2.0 standard, so if a video mode is
  * not determinable then we default to NTSC.
  */
-video_mode rom_get_video_mode(mapper* mapper);
+video_mode_t rom_get_video_mode(mapper_t* mapper);
 
-bool rom_has_persistent_memory(mapper* mapper);
+bool rom_has_persistent_memory(mapper_t* mapper);
 
-bool rom_has_bus_conflicts(mapper* mapper);
+bool rom_has_bus_conflicts(mapper_t* mapper);
 
 /**
  * Read / write from within the CPU
  */
-void mmap_cpu_write(mapper* mapper, uint16_t address, uint8_t val);
-uint8_t mmap_cpu_read(mapper* mapper, uint16_t address, bool dummy);
-void mmap_cpu_dma(mapper* mapper, uint8_t address, uint8_t* buf);
+void mmap_cpu_write(mapper_t* mapper, uint16_t address, uint8_t val);
+uint8_t mmap_cpu_read(mapper_t* mapper, uint16_t address, bool dummy);
+void mmap_cpu_dma(mapper_t* mapper, uint8_t address, uint8_t* buf);
 
 /**
  * Read / write from within the PPU
  */
-void mmap_ppu_write(mapper* mapper, uint16_t address, uint8_t val);
-uint8_t mmap_ppu_read(mapper* mapper, uint16_t address);
+void mmap_ppu_write(mapper_t* mapper, uint16_t address, uint8_t val);
+uint8_t mmap_ppu_read(mapper_t* mapper, uint16_t address);

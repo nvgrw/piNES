@@ -25,14 +25,14 @@ char* front_rom_dialog(void){
   return NULL;
 }
 
-front* front_init(sys* sys) {
-  front* ret = malloc(sizeof(front));
-  ret->sys = sys;
-  ret->tab = FT_SCREEN;
-  ret->scale = 1;
-  return ret;
+front_t* front_init(sys_t* sys) {
+  front_t* front = malloc(sizeof(front_t));
+  front->sys = sys;
+  front->tab = FT_SCREEN;
+  front->scale = 1;
+  return front;
 }
 
-void front_deinit(front* front) {
+void front_deinit(front_t* front) {
   free(front);
 }

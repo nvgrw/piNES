@@ -106,7 +106,7 @@ typedef struct __attribute__((packed)) {
 /**
  * The main PPU struct. Holds internal state, memory, and registers.
  */
-typedef struct {
+typedef struct ppu {
   // Register PPUCTRL
   union {
     struct __attribute__((packed)) {
@@ -176,8 +176,7 @@ typedef struct {
   uint8_t status_sprite0_hit;
 
   // Memory
-  uint8_t memory[PPU_MEMORY];
-  mapper* mapper;
+  mapper_t* mapper;
 
   // Status
   uint16_t cycle;
@@ -185,6 +184,8 @@ typedef struct {
   bool frame_odd;
 
   // Special R/W conditions
+  uint8_t data_buf;
+  uint8_t last_reg_write;
   bool oam_data_ff;
 
   // Internal registers
