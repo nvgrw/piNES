@@ -65,7 +65,7 @@ bool sys_run(sys_t* sys, uint32_t ms, void* context,
 /**
  * Loads a ROM with the given path.
  */
-void sys_rom(sys_t* sys, char* path);
+sys_status_t sys_rom(sys_t* sys, char* path);
 
 /**
  * Starts or resumes the system.

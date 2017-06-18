@@ -63,8 +63,9 @@ int main(int argc, char** argv) {
 
   // Load ROM if provided
   if (preload_rom) {
-    sys_rom(sys, argv[1]);
-    sys_start(sys);
+    if (sys_rom(sys, argv[1]) == SS_NONE) {
+      sys_start(sys);
+    }
   }
 
   // Enter main loop

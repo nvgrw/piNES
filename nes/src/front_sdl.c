@@ -182,7 +182,7 @@ static void flip(front_sdl_impl_t* impl) {
         // Display the NES palette instead
         for (int i = 0; i < 64; i++) {
           rect.h = 4;
-          uint32_t colour = impl->palette[i];
+          uint32_t colour = sys->ppu->nes_palette[i];
           SDL_SetRenderDrawColor(impl->renderer, colour >> 16, colour >> 8,
                                  colour, 0xFF);
           rect.x = (i % 16) * 16;
@@ -191,7 +191,7 @@ static void flip(front_sdl_impl_t* impl) {
         }
       } else {
         for (int i = 0; i < 32; i++) {
-          uint32_t colour = impl->palette[sys->ppu->palette[i] & 0x3F];
+          uint32_t colour = sys->ppu->palette_cache[i];
           SDL_SetRenderDrawColor(impl->renderer, colour >> 16, colour >> 8,
                                  colour, 0xFF);
           rect.x = (i % 16) * 16;
@@ -389,7 +389,7 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
     uint8_t g;
     uint8_t b;
     SDL_GetRGB(colour, ui->format, &r, &g, &b);
-    impl->palette[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+    front->sys->ppu->nes_palette[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
   }
 
   // Create window
@@ -470,6 +470,7 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
     free(impl);
     return NULL;
   }
+  SDL_PauseAudioDevice(impl->audio_device, false);
 
   impl->front = front;
   preflip(impl);
@@ -644,9 +645,7 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
                             (void*)&pitch)) {
           // printf("err: %s\n", SDL_GetError());
         } else {
-          for (int i = 0; i < PPU_SCREEN_SIZE; i++) {
-            pixels[i] = impl->palette[sys->ppu->screen[i]];
-          }
+          memcpy(pixels, sys->ppu->screen, PPU_SCREEN_SIZE_BYTES);
           memset((uint8_t*)pixels + 240 * pitch, 0, 16 * pitch);
           SDL_UnlockTexture(impl->screen_tex);
           SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, NULL);
@@ -667,7 +666,7 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
 static void front_sdl_impl_audio_enqueue(void* context, apu_buffer_t* buffer,
                                          int len) {
   front_sdl_impl_t* impl = (front_sdl_impl_t*)context;
-  //SDL_ClearQueuedAudio(impl->audio_device);
+  SDL_ClearQueuedAudio(impl->audio_device);
   SDL_QueueAudio(impl->audio_device, buffer, len * sizeof(apu_buffer_t));
 }
 

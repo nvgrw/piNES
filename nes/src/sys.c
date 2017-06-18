@@ -89,7 +89,7 @@ bool sys_run(sys_t* sys, uint32_t ms, void* context,
 
 static void sys_reset(sys_t* sys) { cpu_reset(sys->cpu); }
 
-void sys_rom(sys_t* sys, char* path) {
+sys_status_t sys_rom(sys_t* sys, char* path) {
   if (sys->mapper != NULL) {
     rom_destroy(sys->mapper);
     sys->mapper = NULL;
@@ -122,6 +122,7 @@ void sys_rom(sys_t* sys, char* path) {
     sys->mapper->controller = sys->controller;
     sys_reset(sys);
   }
+  return sys->status;
 }
 
 void sys_start(sys_t* sys) {

@@ -198,7 +198,9 @@ typedef struct ppu {
   bool nmi;
 
   // Palette
-  uint8_t palette[32];
+  uint32_t nes_palette[64]; // In ARGB8888 format
+  uint32_t palette_cache[32]; // In ARGB8888 format
+  uint8_t palette[32]; // Index in nes_palette, cached in palette_cache
 
   // Rendering
   uint16_t io_addr;
@@ -228,7 +230,7 @@ typedef struct ppu {
   // Visual output
   ppu_driver_t driver;
   bool flip;
-  uint8_t screen[PPU_SCREEN_SIZE];
+  uint32_t screen[PPU_SCREEN_SIZE];
 } ppu_t;
 
 /**

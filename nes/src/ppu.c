@@ -218,7 +218,9 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
         if (ppu_addr % 4 == 0) {
           ppu_addr &= 0x0F;
         }
-        ppu->palette[ppu_addr & 0x1F] = value & 0x3F;
+        ppu_addr &= 0x1F;
+        ppu->palette[ppu_addr] = value & 0x3F;
+        ppu->palette_cache[ppu_addr] = ppu->nes_palette[value & 0x3F];
       } else {
         mmap_ppu_write(ppu->mapper, ppu_addr, value);
       }
@@ -400,7 +402,8 @@ void ppu_cycle(ppu_t* ppu) {
       // Use the current driver to render the pixel
       switch (ppu->driver) {
         case PPUD_DIRECT:
-          ppu->screen[ppu->cycle - 1 + ppu->scanline * 256] = pixel & 0x3F;
+          ppu->screen[ppu->cycle - 1 + ppu->scanline * 256]
+            = ppu->nes_palette[pixel & 0x3F];
           // Emphasis | (reg.EmpRGB << 6);
           break;
         case PPUD_SIGNAL:

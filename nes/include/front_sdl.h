@@ -24,9 +24,6 @@ typedef struct {
   SDL_Texture* screen_tex;
   SDL_Texture* prescaled_tex;
 
-  // The palette, stored in ARGB8888 format
-  uint32_t palette[64];
-
   SDL_AudioDeviceID audio_device;
 
   // Mouse-related
