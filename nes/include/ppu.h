@@ -231,6 +231,7 @@ typedef struct ppu {
   ppu_driver_t driver;
   bool flip;
   uint32_t screen[PPU_SCREEN_SIZE];
+  uint8_t screen_dbg[PPU_SCREEN_SIZE];
 } ppu_t;
 
 /**

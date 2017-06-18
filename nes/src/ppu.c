@@ -67,8 +67,8 @@ static void ppu_cycle_addr_at(ppu_t* ppu) {
 }
 
 static void ppu_cycle_fetch_at(ppu_t* ppu, bool garbage) {
-  uint16_t v = ppu->v.raw;
-  uint8_t shift = ((v >> 4) & 4) | (v & 2);
+  //uint16_t v = ppu->v.raw;
+  uint8_t shift = (ppu->v.scroll.x_coarse & 2) + 2 * (ppu->v.scroll.y_coarse & 2);
   uint8_t res = (mmap(ppu, ppu->io_addr) >> shift) & 3;
   if (!garbage) {
     ppu->ren_at = res;
@@ -349,6 +349,11 @@ void ppu_cycle(ppu_t* ppu) {
     if (line_visible && cycle_visible) {
       // Render a pixel
       uint8_t pixel = 0;
+      uint8_t pixel_bg = 0;
+      uint8_t pixel_sprite = 0;
+      if ((ppu->v.raw & 0x3F00) == 0x3F00 && !(ppu->mask_show_bg || ppu->mask_show_sprites)) {
+        pixel = ppu->v.raw;
+      }
 
       bool edge = (ppu->cycle < 8 || (ppu->cycle >= 248 && ppu->cycle < 256));
       bool edge_masked = edge || (!ppu->mask_show_left_bg || !ppu->mask_show_left_sprites);
@@ -357,9 +362,11 @@ void ppu_cycle(ppu_t* ppu) {
 
       // Render background
       if (show_bg_e) {
-        pixel = ((uint32_t)(ppu->tile_data >> 32) >> ((7 - ppu->x) * 4)) & 0x0F;
-      } else if ((ppu->v.raw & 0x3F00) == 0x3F00 && !(ppu->mask_show_bg || ppu->mask_show_sprites)) {
-        pixel = ppu->v.raw;
+        pixel_bg = ((uint32_t)(ppu->tile_data >> 32) >> ((7 - ppu->x) * 4)) & 0x0F;
+        if (pixel_bg & 3) {
+          // Show the pixel if it is non-transparent
+          pixel = pixel_bg;
+        }
       }
 
       // PROFILER_POINT(SYS_PPU_BG)
@@ -367,15 +374,14 @@ void ppu_cycle(ppu_t* ppu) {
       // Render sprites
       if (show_sprites_e) {
         uint8_t spr_found = 0xFF;
-        uint8_t spr_pixel = 0;
         for (uint8_t i = 0; i < ppu->spr_count; i++) {
           int16_t offset = (ppu->cycle - 1) - ppu->spr_pos[i];
           if (offset < 0 || offset > 7) {
             continue;
           }
           offset = 7 - offset;
-          spr_pixel = (ppu->spr_pat[i] >> (offset * 4)) & 0x0F;
-          if (spr_pixel % 4 != 0) {
+          pixel_sprite = (ppu->spr_pat[i] >> (offset * 4)) & 0x0F;
+          if (pixel_sprite & 3) {
             // Non-transparent pixel, stop processing sprites
             spr_found = i;
             break;
@@ -384,12 +390,12 @@ void ppu_cycle(ppu_t* ppu) {
         if (spr_found != 0xFF) {
           // Register sprite-0 hit if applicable
           if (cycle_visible && pixel && ppu->spr_index[spr_found] == 0 &&
-              !edge_masked && ppu->cycle != 255 && spr_pixel) {
+              !edge_masked && ppu->cycle != 255 && (pixel_sprite & 3)) {
             ppu->status_sprite0_hit = true;
           }
           // Render the pixel unless behind-background placement wanted
           if (!ppu->spr_priority[spr_found] || !pixel) {
-            pixel = spr_pixel + 0x10;
+            pixel = pixel_sprite + 0x10;
           }
         }
       }
@@ -402,8 +408,9 @@ void ppu_cycle(ppu_t* ppu) {
       // Use the current driver to render the pixel
       switch (ppu->driver) {
         case PPUD_DIRECT:
+          ppu->screen_dbg[ppu->cycle - 1 + ppu->scanline * 256] = pixel;
           ppu->screen[ppu->cycle - 1 + ppu->scanline * 256]
-            = ppu->nes_palette[pixel & 0x3F];
+            = ppu->nes_palette[pixel];
           // Emphasis | (reg.EmpRGB << 6);
           break;
         case PPUD_SIGNAL:

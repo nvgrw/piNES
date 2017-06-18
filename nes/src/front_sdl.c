@@ -201,6 +201,13 @@ static void flip(front_sdl_impl_t* impl) {
                          rect.y - 3);
         }
       }
+
+      // Show colour at current mouse position
+      display_number(impl, impl->mouse_x, 150, 220);
+      display_number(impl, impl->mouse_y, 180, 220);
+      if (impl->mouse_y < 240) {
+        display_number(impl, sys->ppu->screen_dbg[impl->mouse_x + impl->mouse_y * 256], 210, 220);
+      }
     } break;
     case FT_IO: {
       // Display controller sprites with active buttons
@@ -378,8 +385,8 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
 
   // Initialise front implementation struct
   front_sdl_impl_t* impl = calloc(1, sizeof(front_sdl_impl_t));
-  impl->mouse_x = -1;
-  impl->mouse_y = -1;
+  impl->mouse_x = 0;
+  impl->mouse_y = 0;
   impl->mouse_down = false;
 
   // Initialise palette
@@ -470,6 +477,7 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
     free(impl);
     return NULL;
   }
+  // Enables queuing
   SDL_PauseAudioDevice(impl->audio_device, false);
 
   impl->front = front;
