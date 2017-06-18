@@ -4,9 +4,14 @@ project (nes)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${PROJECT_SOURCE_DIR}/cmake")
 
 option (IS_PI "IS_PI" OFF)
+option (TCP_HOST "TCP_HOST" ON)
 
 if(IS_PI)
   set (EXTRA_FLAGS "-DIS_PI")
+endif()
+
+if(TCP_HOST)
+  set (EXTRA_FLAGS "${EXTRA_FLAGS} -DTCP_HOST")
 endif()
 
 set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -D_THREAD_SAFE ${EXTRA_FLAGS} -std=c99 -Werror -pedantic")
