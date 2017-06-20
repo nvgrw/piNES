@@ -355,7 +355,7 @@ void ppu_cycle(ppu_t* ppu) {
         pixel = ppu->v.raw;
       }
 
-      bool edge = (ppu->cycle < 8 || (ppu->cycle >= 248 && ppu->cycle < 256));
+      bool edge = (ppu->cycle < 8 || (ppu->cycle >= 249 && ppu->cycle <= 256));
       bool edge_masked = edge || (!ppu->mask_show_left_bg || !ppu->mask_show_left_sprites);
       bool show_bg_e = show_bg && (!edge || ppu->mask_show_left_bg);
       bool show_sprites_e = show_sprites && (!edge || ppu->mask_show_left_sprites);
