@@ -18,6 +18,7 @@ NFD_LDFLAGS = -L$(NFD_DIR)/build/lib/Release/x64 -lnfd
 CC ?= gcc
 CFLAGS ?= -I$(SPC_INCLUDE_DIR) -Wall -O3 -D_POSIX_SOURCE -D_BSD_SOURCE -std=c99 -Werror -pedantic
 MOD_CFLAGS = $(CFLAGS) $(SDL_CFLAGS) $(SDL_IMAGE_CFLAGS) $(NFD_CFLAGS) -D_THREAD_SAFE
+#-DTCP_HOST
 MOD_LDFLAGS = $(SDL_LDFLAGS) $(SDL_IMAGE_LDFLAGS) $(NFD_LDFLAGS) -framework AppKit -framework OpenGL -framework Cocoa
 
 # main rule

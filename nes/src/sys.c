@@ -47,9 +47,6 @@ bool sys_run(sys_t* sys, uint32_t ms, void* context,
       if (cpu_cycle(sys->cpu)) {
         // Trapped, stop execution
         switch (sys->cpu->status) {
-          case CS_TRAPPED:
-            sys->status = SS_CPU_TRAPPED;
-            break;
           case CS_UNSUPPORTED_INSTRUCTION:
             sys->status = SS_CPU_UNSUPPORTED_INSTRUCTION;
             break;

@@ -29,7 +29,6 @@ typedef enum {
   SS_ROM_MAPPER,
 
   // CPU errors
-  SS_CPU_TRAPPED,
   SS_CPU_UNSUPPORTED_INSTRUCTION
 } sys_status_t;
 

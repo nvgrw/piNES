@@ -84,21 +84,14 @@ static uint8_t PROFILER_COLOURS[] = {
  */
 static void display_number(front_sdl_impl_t* impl, uint32_t num, uint16_t x,
                            uint16_t y) {
-  SDL_Rect src = {.x = 144, .y = 0, .w = 8, .h = 8};
-  SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
+  SDL_Rect src = {.x = 96, .y = 0, .w = 5, .h = 8};
+  SDL_Rect dest = {.x = x, .y = y, .w = 5, .h = 8};
   if (!num) {
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
     return;
   }
   while (num) {
-    uint8_t digit = num % 10;
-    if (digit < 8) {
-      src.x = 144 + digit * 8;
-      src.y = 0;
-    } else {
-      src.x = 16 + (digit - 8) * 8;
-      src.y = 8;
-    }
+    src.x = 96 + (num % 10) * 5;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
     dest.x -= 4;
     num /= 10;
@@ -107,8 +100,8 @@ static void display_number(front_sdl_impl_t* impl, uint32_t num, uint16_t x,
 
 static void display_text(front_sdl_impl_t* impl, char* str, uint16_t x,
                          uint16_t y) {
-  SDL_Rect src = {.x = 0, .y = 0, .w = 8, .h = 8};
-  SDL_Rect dest = {.x = x, .y = y, .w = 8, .h = 8};
+  SDL_Rect src = {.x = 0, .y = 0, .w = 5, .h = 8};
+  SDL_Rect dest = {.x = x, .y = y, .w = 5, .h = 8};
   while (*str != 0) {
     uint8_t ch = *str;
     if (ch >= 97 && ch <= 122) {
@@ -117,8 +110,8 @@ static void display_text(front_sdl_impl_t* impl, char* str, uint16_t x,
     }
     if (ch >= 32 && ch <= 96) {
       ch -= 32;
-      src.x = 16 + (ch % 24) * 8;
-      src.y = (ch / 24) * 8;
+      src.x = 16 + (ch % 38) * 5;
+      src.y = (ch / 38) * 8;
       SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
     }
     dest.x += 4;
@@ -152,6 +145,11 @@ static void preflip(front_sdl_impl_t* impl) {
 }
 
 static void flip(front_sdl_impl_t* impl) {
+  int x_edge = impl->screen_rect->w + impl->screen_rect->x * 2;
+  int y_edge = impl->screen_rect->h + impl->screen_rect->y * 2;
+  int x_mid = x_edge / 2;
+  int y_mid = y_edge / 2;
+
   SDL_Rect src;
   SDL_Rect dest;
 
@@ -162,14 +160,14 @@ static void flip(front_sdl_impl_t* impl) {
     case FT_PPU: {
       // PPU OAM data
       ppu_t* ppu = sys->ppu;
-      display_number(impl, ppu->spr_count_max, 240, 8);
+      display_number(impl, ppu->spr_count_max, x_edge - 16, 8);
       uint16_t spr_y = 16;
-      for (int i = 0; i < 64 && spr_y < 256; i++) {
+      for (int i = 0; i < 64 && spr_y < y_edge; i++) {
         if (ppu->oam.sprites[i].y < 0xEF) {
-          display_number(impl, ppu->oam.sprites[i].y, 150, spr_y);
-          display_number(impl, ppu->oam.sprites[i].index, 180, spr_y);
-          display_number(impl, ppu->oam.sprites[i].attr, 210, spr_y);
-          display_number(impl, ppu->oam.sprites[i].x, 240, spr_y);
+          display_number(impl, ppu->oam.sprites[i].y, x_edge - 106, spr_y);
+          display_number(impl, ppu->oam.sprites[i].index, x_edge - 76, spr_y);
+          display_number(impl, ppu->oam.sprites[i].attr, x_edge - 46, spr_y);
+          display_number(impl, ppu->oam.sprites[i].x, x_edge - 16, spr_y);
           spr_y += 8;
         }
       }
@@ -178,7 +176,7 @@ static void flip(front_sdl_impl_t* impl) {
       SDL_Rect rect;
       rect.w = 16;
       rect.h = 8;
-      if (impl->mouse_y >= 240) {
+      if (impl->mouse_y >= y_edge - 16) {
         // Display the NES palette instead
         for (int i = 0; i < 64; i++) {
           rect.h = 4;
@@ -203,21 +201,21 @@ static void flip(front_sdl_impl_t* impl) {
       }
 
       // Show colour at current mouse position
-      display_number(impl, impl->mouse_x, impl->screen_rect->w - 106, impl->screen_rect->h - 36);
-      display_number(impl, impl->mouse_y, impl->screen_rect->w - 76, impl->screen_rect->h - 36);
-      if (impl->mouse_y < 240) {
+      display_number(impl, impl->mouse_x, x_edge - 106, y_edge - 36);
+      display_number(impl, impl->mouse_y, x_edge - 76, y_edge - 36);
+      if (impl->mouse_x < 256 && impl->mouse_y < 240) {
         display_number(impl, sys->ppu->screen_dbg[impl->mouse_x + impl->mouse_y * 256],
-                       impl->screen_rect->h - 46, impl->screen_rect->h - 36);
+                       x_edge - 46, y_edge - 36);
       }
     } break;
     case FT_IO: {
       // Display controller sprites with active buttons
       for (int i = 0; i < 2; i++) {
-        src.x = 80;
-        src.y = 88;
+        src.x = 48;
+        src.y = 32;
         src.w = dest.w = 24;
         src.h = dest.h = 16;
-        dest.y = impl->screen_rect->h - 16;
+        dest.y = y_edge - 16;
         dest.x = i * 24;
         SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
         controller_pressed_t pressed = sys->controller->pressed1;
@@ -226,12 +224,12 @@ static void flip(front_sdl_impl_t* impl) {
         }
 #define BUTTON(SX, SY, SW, SH, BUT)                        \
   if (BUT) {                                               \
-    src.x = 104 + SX;                                      \
-    src.y = 88 + SY;                                       \
+    src.x = 72 + SX;                                       \
+    src.y = 32 + SY;                                       \
     src.w = dest.w = SW;                                   \
     src.h = dest.h = SH;                                   \
     dest.x = i * 24 + SX;                                  \
-    dest.y = 240 + SY;                                     \
+    dest.y = (y_edge - 16) + SY;                           \
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest); \
   }
         BUTTON(17, 6, 4, 4, pressed.a)
@@ -313,19 +311,28 @@ static void flip(front_sdl_impl_t* impl) {
 
     // Button icons
     src.x = dest.x = 0;
-    src.y = 48;
+    src.y = 16;
     src.w = dest.w = BUTTON_NUM * 16;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
 
-  // Render system status, if any
   if (sys->status != SS_NONE) {
-    src.x = 80 + (sys->status - 1) * 24;
-    src.y = 64;
+    // Render system status
+    src.x = (sys->status - 1) * 24;
+    src.y = 48;
     src.w = dest.w = 24;
     src.h = dest.h = 24;
-    dest.x = (impl->screen_rect->w / 2) - 12;
-    dest.y = (impl->screen_rect->h / 2) - 12;
+    dest.x = x_mid - 12;
+    dest.y = y_mid - 12;
+    SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
+  } else if (!sys->running) {
+    // Display pines logo
+    src.x = 128;
+    src.y = 32;
+    src.w = dest.w = 32;
+    src.h = dest.h = 40;
+    dest.x = x_mid - 16;
+    dest.y = y_mid - 20;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
 
@@ -399,7 +406,7 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
 
   // Initialise palette
   for (int i = 0; i < 16 * 4; i++) {
-    uint32_t colour = ((uint32_t*)ui->pixels)[(i % 16) + (i / 16) * ui->w * 8];
+    uint32_t colour = ((uint32_t*)ui->pixels)[(i % 16) + (i / 16) * ui->w * 4];
     uint8_t r;
     uint8_t g;
     uint8_t b;
@@ -668,9 +675,6 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
                 front_sdl_impl_audio_get_queue_size)) {
       // The system crashed
       switch (sys->status) {
-        case SS_CPU_TRAPPED:
-          display_message(impl, "CPU trap detected!");
-          break;
         case SS_CPU_UNSUPPORTED_INSTRUCTION:
           display_message(impl, UNSUPPORTED_INSTRUCTION_MESSAGE);
           impl->message[2] = HEXADECIMAL[sys->cpu->last_opcode >> 4];

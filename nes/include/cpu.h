@@ -23,7 +23,6 @@
  */
 typedef enum {
   CS_NONE,
-  CS_TRAPPED,
   CS_UNSUPPORTED_INSTRUCTION
 } cpu_status_t;
 
