@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "apu.h"
 #include "controller_sdl.h"
 #include "error.h"
 #include "front.h"
@@ -206,6 +207,22 @@ static void flip(front_sdl_impl_t* impl) {
       if (impl->mouse_x < 256 && impl->mouse_y < 240) {
         display_number(impl, sys->ppu->screen_dbg[impl->mouse_x + impl->mouse_y * 256],
                        x_edge - 46, y_edge - 36);
+      }
+    } break;
+    case FT_APU: {
+      // Display the audio buffer
+      dest.x = 0;
+      dest.y = 0;
+      dest.w = 1;
+      dest.h = 1;
+      SDL_SetRenderDrawColor(impl->renderer, 0x11, 0xFF, 0x11, 0xFF);
+      //int step = AUDIO_BUFFER_SIZE / 256;
+      int j = sys->apu->buffer_cursor;
+      for (int i = 0; i < 256; i++) {
+        dest.y = y_edge - 1 - sys->apu->buffer[j % AUDIO_BUFFER_SIZE] * 32.0;
+        SDL_RenderFillRect(impl->renderer, &dest);
+        j++;
+        dest.x++;
       }
     } break;
     case FT_IO: {
@@ -687,7 +704,7 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
 
     if (sys->running &&
         (impl->front->tab == FT_SCREEN || impl->front->tab == FT_PPU ||
-         impl->front->tab == FT_IO)) {
+         impl->front->tab == FT_APU || impl->front->tab == FT_IO)) {
       // If the system is running, flip on demand
       if (sys->ppu->flip || force_flip) {
         uint32_t* pixels;
