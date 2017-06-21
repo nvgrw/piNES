@@ -22,15 +22,15 @@
 #define BUTTON_START 1
 #define BUTTON_STOP 2
 #define BUTTON_PAUSE 3
-#define BUTTON_STEP 4
-#define BUTTON_CPU 5
-#define BUTTON_PPU 6
-#define BUTTON_APU 7
-#define BUTTON_IO 8
-#define BUTTON_MMC_CPU 9
-#define BUTTON_MMC_PPU 10
-#define BUTTON_TEST 11
-#define BUTTON_ZOOM 12
+#define BUTTON_CPU 4
+#define BUTTON_PPU 5
+#define BUTTON_APU 6
+#define BUTTON_IO 7
+#define BUTTON_MMC_CPU 8
+#define BUTTON_MMC_PPU 9
+#define BUTTON_TEST 10
+#define BUTTON_ZOOM 11
+#define BUTTON_FULL 12
 
 #define BUTTON_NUM 13
 
@@ -186,7 +186,7 @@ static void flip(front_sdl_impl_t* impl) {
           SDL_SetRenderDrawColor(impl->renderer, colour >> 16, colour >> 8,
                                  colour, 0xFF);
           rect.x = (i % 16) * 16;
-          rect.y = (i / 16) * 4 + 240;
+          rect.y = (i / 16) * 4 + (impl->screen_rect->h - 16);
           SDL_RenderFillRect(impl->renderer, &rect);
         }
       } else {
@@ -195,7 +195,7 @@ static void flip(front_sdl_impl_t* impl) {
           SDL_SetRenderDrawColor(impl->renderer, colour >> 16, colour >> 8,
                                  colour, 0xFF);
           rect.x = (i % 16) * 16;
-          rect.y = (i / 16) * 8 + 240;
+          rect.y = (i / 16) * 8 + (impl->screen_rect->h - 16);
           SDL_RenderFillRect(impl->renderer, &rect);
           display_number(impl, sys->ppu->palette[i] & 0x3F, rect.x + 6,
                          rect.y - 3);
@@ -203,10 +203,11 @@ static void flip(front_sdl_impl_t* impl) {
       }
 
       // Show colour at current mouse position
-      display_number(impl, impl->mouse_x, 150, 220);
-      display_number(impl, impl->mouse_y, 180, 220);
+      display_number(impl, impl->mouse_x, impl->screen_rect->w - 106, impl->screen_rect->h - 36);
+      display_number(impl, impl->mouse_y, impl->screen_rect->w - 76, impl->screen_rect->h - 36);
       if (impl->mouse_y < 240) {
-        display_number(impl, sys->ppu->screen_dbg[impl->mouse_x + impl->mouse_y * 256], 210, 220);
+        display_number(impl, sys->ppu->screen_dbg[impl->mouse_x + impl->mouse_y * 256],
+                       impl->screen_rect->h - 46, impl->screen_rect->h - 36);
       }
     } break;
     case FT_IO: {
@@ -216,7 +217,7 @@ static void flip(front_sdl_impl_t* impl) {
         src.y = 88;
         src.w = dest.w = 24;
         src.h = dest.h = 16;
-        dest.y = 240;
+        dest.y = impl->screen_rect->h - 16;
         dest.x = i * 24;
         SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
         controller_pressed_t pressed = sys->controller->pressed1;
@@ -323,14 +324,15 @@ static void flip(front_sdl_impl_t* impl) {
     src.y = 64;
     src.w = dest.w = 24;
     src.h = dest.h = 24;
-    dest.x = 116;
-    dest.y = 116;
+    dest.x = (impl->screen_rect->w / 2) - 12;
+    dest.y = (impl->screen_rect->h / 2) - 12;
     SDL_RenderCopy(impl->renderer, impl->ui, &src, &dest);
   }
 
   // Render display message, if any
   if (impl->message_ticks) {
-    display_text(impl, impl->message, 250 - strlen(impl->message) * 4, 244);
+    display_text(impl, impl->message, (impl->screen_rect->w - 6) - strlen(impl->message) * 4,
+                 impl->screen_rect->h - 12);
   }
 
   PROFILER_POINT(END)
@@ -339,7 +341,7 @@ static void flip(front_sdl_impl_t* impl) {
   // Display profiler data
   float* times = profiler_get_times();
   dest.x = 0;
-  dest.y = 250;
+  dest.y = impl->screen_rect->h - 6;
   dest.h = 6;
   for (int i = 0; i < PROFILER_NUM_POINTS; i++) {
     dest.w = times[i] * 256;
@@ -385,6 +387,12 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
 
   // Initialise front implementation struct
   front_sdl_impl_t* impl = calloc(1, sizeof(front_sdl_impl_t));
+  impl->screen_rect = malloc(sizeof(SDL_Rect));
+  impl->screen_rect->x = 0;
+  impl->screen_rect->y = 0;
+  impl->screen_rect->w = 256;
+  impl->screen_rect->h = 256;
+  impl->full = false;
   impl->mouse_x = 0;
   impl->mouse_y = 0;
   impl->mouse_down = false;
@@ -563,9 +571,6 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
               case BUTTON_PAUSE:
                 sys_pause(sys);
                 break;
-              case BUTTON_STEP:
-                sys_step(sys);
-                break;
               case BUTTON_CPU:
               case BUTTON_PPU:
               case BUTTON_APU:
@@ -582,6 +587,9 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
                 sys_test(sys);
                 break;
               case BUTTON_ZOOM: {
+                if (impl->full) {
+                  break;
+                }
                 uint8_t scale = impl->front->scale;
                 switch (scale) {
                   case 1:
@@ -594,11 +602,43 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
                     scale = 1;
                     break;
                 }
-                SDL_SetWindowSize(impl->window, 256 * scale, 256 * scale);
                 impl->front->scale = scale;
-                force_flip = true;
                 display_message(impl, SCALE_FACTORS[scale - 1]);
+                if (!impl->full) {
+                  SDL_SetWindowSize(impl->window, 256 * scale, 256 * scale);
+                  force_flip = true;
+                }
               } break;
+              case BUTTON_FULL:
+                impl->full = !impl->full;
+                if (impl->full) {
+                  SDL_SetWindowSize(impl->window, 256, 256);
+                  SDL_SetWindowFullscreen(impl->window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+                  int w;
+                  int h;
+                  SDL_GetWindowSize(impl->window, &w, &h);
+                  impl->screen_rect->x = 0;
+                  impl->screen_rect->y = 0;
+                  impl->screen_rect->w = w;
+                  impl->screen_rect->h = h;
+                  if (w < h) {
+                    impl->screen_rect->y = (h - w) / 2;
+                    impl->screen_rect->w = impl->screen_rect->h = w;
+                  } else {
+                    impl->screen_rect->x = (w - h) / 2;
+                    impl->screen_rect->w = impl->screen_rect->h = h;
+                  }
+                  impl->front->scale = 1;
+                } else {
+                  impl->screen_rect->x = 0;
+                  impl->screen_rect->y = 0;
+                  impl->screen_rect->w = 256;
+                  impl->screen_rect->h = 256;
+                  SDL_SetWindowFullscreen(impl->window, 0);
+                  SDL_SetWindowSize(impl->window, 256 * impl->front->scale, 256 * impl->front->scale);
+                  force_flip = true;
+                }
+                break;
             }
           }
           break;
@@ -656,7 +696,7 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
           memcpy(pixels, sys->ppu->screen, PPU_SCREEN_SIZE_BYTES);
           memset((uint8_t*)pixels + 240 * pitch, 0, 16 * pitch);
           SDL_UnlockTexture(impl->screen_tex);
-          SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, NULL);
+          SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, impl->screen_rect);
           flip(impl);
         }
         sys->ppu->flip = false;

@@ -17,16 +17,21 @@
  * SDL-specific front data.
  */
 typedef struct {
-  // SDL and video-related
+  // SDL and video
   SDL_Window* window;
   SDL_Renderer* renderer;
   SDL_Texture* ui;
   SDL_Texture* screen_tex;
   SDL_Texture* prescaled_tex;
 
+  // Fullscreen
+  SDL_Rect* screen_rect;
+  bool full;
+
+  // Audio
   SDL_AudioDeviceID audio_device;
 
-  // Mouse-related
+  // Mouse
   int32_t mouse_x;
   int32_t mouse_y;
   bool mouse_down;
