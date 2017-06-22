@@ -451,7 +451,6 @@ static apu_buffer_t apu_mix(apu_t* apu) {
 
 // ----- REST -----
 static void apu_write_to_buffer(apu_t* apu, apu_buffer_t value) {
-  //printf("v: %f\n", value);
   apu->buffer[apu->buffer_cursor] = value;
   apu->buffer_cursor++;
   apu->buffer_cursor %= AUDIO_BUFFER_SIZE;
