@@ -694,17 +694,6 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
                 impl->full = !impl->full;
                 if (impl->full) {
 #ifdef ALT_FULLSCREEN
-                  SDL_SetWindowSize(impl->window, 800, 600);
-                  SDL_SetWindowFullscreen(impl->window, SDL_WINDOW_FULLSCREEN);
-                  int w;
-                  int h;
-                  SDL_GetWindowSize(impl->window, &w, &h);
-                  impl->screen_rect->x = 100;
-                  impl->screen_rect->y = 0;
-                  impl->screen_rect->w = 600;
-                  impl->screen_rect->h = 600;
-                  impl->front->scale = 1;
-#else
                   SDL_SetWindowSize(impl->window, 256, 256);
                   SDL_SetWindowFullscreen(impl->window,
                                           SDL_WINDOW_FULLSCREEN_DESKTOP);
@@ -722,6 +711,17 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
                     impl->screen_rect->x = (w - h) / 2;
                     impl->screen_rect->w = impl->screen_rect->h = h;
                   }
+                  impl->front->scale = 1;
+#else
+                  SDL_SetWindowSize(impl->window, 800, 600);
+                  SDL_SetWindowFullscreen(impl->window, SDL_WINDOW_FULLSCREEN);
+                  int w;
+                  int h;
+                  SDL_GetWindowSize(impl->window, &w, &h);
+                  impl->screen_rect->x = 100;
+                  impl->screen_rect->y = 0;
+                  impl->screen_rect->w = 600;
+                  impl->screen_rect->h = 600;
                   impl->front->scale = 1;
 #endif
                 } else {
