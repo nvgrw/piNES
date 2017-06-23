@@ -103,7 +103,6 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       apu->channel_pulse2.sweep.c_divider_period = r.data.period;
       apu->channel_pulse2.sweep.c_negate = r.data.negate;
       apu->channel_pulse2.sweep.c_shift_count = r.data.shift_count;
-      // Set sweep period pointer
     } break;
     case 0x4006: {
       AR(apu_register_4002_4006_t);
@@ -473,7 +472,8 @@ void apu_cycle(apu_t* apu, void* context, apu_enqueue_audio_t enqueue_audio,
     if (apu->buffer_cursor == 0) {
       enqueue_audio(context, apu->buffer, AUDIO_BUFFER_SIZE);
     }
-    apu->sample_skips += (APU_SAMPLE_RATE / APU_ACTUAL_SAMPLE_RATE);
+
+    apu->sample_skips += APU_SAMPLE_RATE / APU_ACTUAL_SAMPLE_RATE;
   } else {
     apu->sample_skips -= 1.0;
   }

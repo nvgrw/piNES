@@ -8,7 +8,7 @@
 #include "apu_typedefs.h"
 #include "rom.h"
 
-#define APU_SAMPLE_RATE 1789773.0
+#define APU_SAMPLE_RATE (21470000 / 12.0)
 #define APU_ACTUAL_SAMPLE_RATE 44100
 #define AUDIO_BUFFER_SIZE 512
 
