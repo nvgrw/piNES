@@ -11,6 +11,7 @@ typedef struct {
   // Last register contents
   uint8_t c_volume_envelope;
   bool c_env_loop_flag;
+  bool c_constant_volume_flag;
 } apu_unit_envelope_t;
 
 typedef struct {
@@ -41,6 +42,7 @@ typedef struct {
 } apu_unit_length_counter_t;
 
 void apu_unit_envelope_clock(apu_unit_envelope_t* unit);
+uint8_t apu_unit_envelope_output(apu_unit_envelope_t* unit);
 
 void apu_unit_sweep_sweep(apu_unit_sweep_t* unit, bool ones_complement);
 void apu_unit_sweep_clock(apu_unit_sweep_t* unit, bool ones_complement);

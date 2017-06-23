@@ -205,18 +205,74 @@ static void flip(front_sdl_impl_t* impl) {
       display_number(impl, impl->mouse_x, x_edge - 106, y_edge - 36);
       display_number(impl, impl->mouse_y, x_edge - 76, y_edge - 36);
       if (impl->mouse_x < 256 && impl->mouse_y < 240) {
-        display_number(impl, sys->ppu->screen_dbg[impl->mouse_x + impl->mouse_y * 256],
-                       x_edge - 46, y_edge - 36);
+        display_number(
+            impl, sys->ppu->screen_dbg[impl->mouse_x + impl->mouse_y * 256],
+            x_edge - 46, y_edge - 36);
       }
     } break;
     case FT_APU: {
+      uint8_t offset = 128;
+      uint8_t left = 8;
+      char bufstr[255];
+
+      sprintf(
+          bufstr, " Pulse 1  %05d %05d %03d   %s     %s     %s    ",
+          sys->apu->channel_pulse1.timer.divider,
+          sys->apu->channel_pulse1.timer.c_timer_period,
+          sys->apu->channel_pulse1.length_counter.length_counter,
+          sys->apu->channel_pulse1.length_counter.c_length_counter_load ? "T"
+                                                                        : "F",
+          sys->apu->channel_pulse1.length_counter.c_length_counter_hold ? "T"
+                                                                        : "F",
+          sys->apu->previous_status.data.enable_pulse1 ? "T" : "F");
+      display_text(impl, bufstr, left, 16 + offset);
+
+      sprintf(
+          bufstr, " Pulse 2  %05d %05d %03d   %s     %s     %s    ",
+          sys->apu->channel_pulse2.timer.divider,
+          sys->apu->channel_pulse2.timer.c_timer_period,
+          sys->apu->channel_pulse2.length_counter.length_counter,
+          sys->apu->channel_pulse2.length_counter.c_length_counter_load ? "T"
+                                                                        : "F",
+          sys->apu->channel_pulse2.length_counter.c_length_counter_hold ? "T"
+                                                                        : "F",
+          sys->apu->previous_status.data.enable_pulse2 ? "T" : "F");
+      display_text(impl, bufstr, left, 32 + offset);
+
+      sprintf(
+          bufstr, "   Noise  %05d %05d %03d   %s     %s     %s    ",
+          sys->apu->channel_noise.timer.divider,
+          sys->apu->channel_noise.timer.c_timer_period,
+          sys->apu->channel_noise.length_counter.length_counter,
+          sys->apu->channel_noise.length_counter.c_length_counter_load ? "T"
+                                                                       : "F",
+          sys->apu->channel_noise.length_counter.c_length_counter_hold ? "T"
+                                                                       : "F",
+          sys->apu->previous_status.data.enable_noise ? "T" : "F");
+      display_text(impl, bufstr, left, 48 + offset);
+
+      sprintf(
+          bufstr, "Triangle  %05d %05d %03d   %s     %s     %s    ",
+          sys->apu->channel_triangle.timer.divider,
+          sys->apu->channel_triangle.timer.c_timer_period,
+          sys->apu->channel_triangle.length_counter.length_counter,
+          sys->apu->channel_triangle.length_counter.c_length_counter_load ? "T"
+                                                                          : "F",
+          sys->apu->channel_triangle.length_counter.c_length_counter_hold ? "T"
+                                                                          : "F",
+          sys->apu->previous_status.data.enable_triangle ? "T" : "F");
+      display_text(impl, bufstr, left, 64 + offset);
+
+      display_text(impl, "T Div T Per Len P Len L Len H Enbld", left + 40,
+                   offset);
+
       // Display the audio buffer
       dest.x = 0;
       dest.y = 0;
       dest.w = 1;
       dest.h = 1;
       SDL_SetRenderDrawColor(impl->renderer, 0x11, 0xFF, 0x11, 0xFF);
-      //int step = AUDIO_BUFFER_SIZE / 256;
+      // int step = AUDIO_BUFFER_SIZE / 256;
       int j = sys->apu->buffer_cursor;
       for (int i = 0; i < 256; i++) {
         dest.y = y_edge - 1 - sys->apu->buffer[j % AUDIO_BUFFER_SIZE] * 32.0;
@@ -355,7 +411,8 @@ static void flip(front_sdl_impl_t* impl) {
 
   // Render display message, if any
   if (impl->message_ticks) {
-    display_text(impl, impl->message, (impl->screen_rect->w - 6) - strlen(impl->message) * 4,
+    display_text(impl, impl->message,
+                 (impl->screen_rect->w - 6) - strlen(impl->message) * 4,
                  impl->screen_rect->h - 12);
   }
 
@@ -498,7 +555,7 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
   audio_want.callback = NULL;
   audio_want.channels = 1;
   audio_want.userdata = impl;
-  impl->audio_device = 
+  impl->audio_device =
       SDL_OpenAudioDevice(NULL, 0, &audio_want, &audio_have, 0);
   if (!impl->audio_device) {
     fprintf(stderr, "Could not create audio device, %s\n", SDL_GetError());
@@ -638,7 +695,8 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
                 if (impl->full) {
 #ifdef ALT_FULLSCREEN
                   SDL_SetWindowSize(impl->window, 256, 256);
-                  SDL_SetWindowFullscreen(impl->window, SDL_WINDOW_FULLSCREEN_DESKTOP);
+                  SDL_SetWindowFullscreen(impl->window,
+                                          SDL_WINDOW_FULLSCREEN_DESKTOP);
                   int w;
                   int h;
                   SDL_GetWindowSize(impl->window, &w, &h);
@@ -672,7 +730,8 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
                   impl->screen_rect->w = 256;
                   impl->screen_rect->h = 256;
                   SDL_SetWindowFullscreen(impl->window, 0);
-                  SDL_SetWindowSize(impl->window, 256 * impl->front->scale, 256 * impl->front->scale);
+                  SDL_SetWindowSize(impl->window, 256 * impl->front->scale,
+                                    256 * impl->front->scale);
                   force_flip = true;
                 }
                 break;
@@ -730,7 +789,8 @@ void front_sdl_impl_run(front_sdl_impl_t* impl) {
           memcpy(pixels, sys->ppu->screen, PPU_SCREEN_SIZE_BYTES);
           memset((uint8_t*)pixels + 240 * pitch, 0, 16 * pitch);
           SDL_UnlockTexture(impl->screen_tex);
-          SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL, impl->screen_rect);
+          SDL_RenderCopy(impl->renderer, impl->screen_tex, NULL,
+                         impl->screen_rect);
           flip(impl);
         }
         sys->ppu->flip = false;

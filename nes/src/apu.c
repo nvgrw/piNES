@@ -7,10 +7,6 @@
 apu_t* apu_init(void) {
   apu_t* apu = calloc(1, sizeof(apu_t));
   apu->sample_skips = 0.0;
-  apu->buffer = malloc(AUDIO_BUFFER_SIZE * sizeof(apu_buffer_t));
-  for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-    apu->buffer[i] = 0.0;
-  }
   apu->buffer_cursor = 0;
   apu->is_even_cycle = false;
 
@@ -53,8 +49,10 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       AR(apu_register_4000_4004_t);
       apu->channel_pulse1.envelope.c_volume_envelope =
           r.data_period.divider_period;
-      apu->channel_pulse1.envelope.c_env_loop_flag =
+      apu->channel_pulse1.envelope.c_constant_volume_flag =
           r.data_period.constant_volume_envelope;
+      apu->channel_pulse1.envelope.c_env_loop_flag =
+          r.data_period.length_counter_halt;
       apu->channel_pulse1.length_counter.c_length_counter_hold =
           r.data_period.length_counter_halt;
       apu->channel_pulse1.envelope.start_flag = true;
@@ -91,8 +89,10 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
       AR(apu_register_4000_4004_t);
       apu->channel_pulse2.envelope.c_volume_envelope =
           r.data_period.divider_period;
-      apu->channel_pulse2.envelope.c_env_loop_flag =
+      apu->channel_pulse2.envelope.c_constant_volume_flag =
           r.data_period.constant_volume_envelope;
+      apu->channel_pulse2.envelope.c_env_loop_flag =
+          r.data_period.length_counter_halt;
       apu->channel_pulse2.length_counter.c_length_counter_hold =
           r.data_period.length_counter_halt;
       apu->channel_pulse2.envelope.start_flag = true;
@@ -152,10 +152,12 @@ void apu_mem_write(apu_t* apu, uint16_t address, uint8_t val) {
     } break;
     case 0x400C: {
       AR(apu_register_4000_4004_t);
-      apu->channel_noise.envelope.c_env_loop_flag =
+      apu->channel_noise.envelope.c_constant_volume_flag =
           r.data_noise.constant_volume_envelope;
       apu->channel_noise.envelope.c_volume_envelope =
           r.data_noise.divider_period;
+      apu->channel_noise.envelope.c_env_loop_flag =
+          r.data_noise.length_counter_halt;
       apu->channel_noise.length_counter.c_length_counter_hold =
           r.data_noise.length_counter_halt;
     } break;
@@ -254,6 +256,8 @@ uint8_t apu_mem_read(apu_t* apu, uint16_t address) {
     LENGTH_COUNTER_STATUS(triangle);
     LENGTH_COUNTER_STATUS(noise);
 
+#undef LENGTH_COUNTER_STATUS
+
     // TODO: Handle DMC
     status.data.enable_dmc = 0;
 
@@ -263,7 +267,6 @@ uint8_t apu_mem_read(apu_t* apu, uint16_t address) {
 
     status.data.dmc_interrupt = apu->previous_status.data.dmc_interrupt;
 
-#undef LENGTH_COUNTER_STATUS
     return status.raw;
   }
 
@@ -405,7 +408,7 @@ static uint8_t apu_output_pulse(bool enabled, apu_channel_pulse_t* channel) {
   if (channel->length_counter.length_counter == 0) return 0;
   if (channel->timer.divider < 8) return 0;
 
-  return channel->envelope.decay_level_counter;
+  return apu_unit_envelope_output(&channel->envelope);
 }
 
 static uint8_t apu_output_noise(bool enabled, apu_channel_noise_t* channel) {
@@ -414,7 +417,7 @@ static uint8_t apu_output_noise(bool enabled, apu_channel_noise_t* channel) {
   if ((channel->shift_register & 0x1) == 0x1) return 0;
   if (channel->length_counter.length_counter == 0) return 0;
 
-  return channel->envelope.decay_level_counter;
+  return apu_unit_envelope_output(&channel->envelope);
 }
 
 static uint8_t apu_output_triangle(bool enabled,
@@ -443,6 +446,7 @@ static apu_buffer_t apu_mix(apu_t* apu) {
                                        &apu->channel_noise);
   uint8_t dmc_out =
       apu_output_dmc(apu->previous_status.data.enable_dmc, &apu->channel_dmc);
+
   double pulse_out = apu->lookup_pulse_table[pulse1_out + pulse2_out];
   double tnd_out =
       apu->lookup_tnd_table[3 * triangle_out + 2 * noise_out + dmc_out];
@@ -451,7 +455,6 @@ static apu_buffer_t apu_mix(apu_t* apu) {
 
 // ----- REST -----
 static void apu_write_to_buffer(apu_t* apu, apu_buffer_t value) {
-  //printf("v: %f\n", value);
   apu->buffer[apu->buffer_cursor] = value;
   apu->buffer_cursor++;
   apu->buffer_cursor %= AUDIO_BUFFER_SIZE;
