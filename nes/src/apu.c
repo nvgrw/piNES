@@ -402,8 +402,6 @@ static uint8_t apu_output_pulse(bool enabled, apu_channel_pulse_t* channel) {
   if (!enabled) return 0;
 
   if (channel->duty_cycle_value == 0) return 0;
-  // TODO: Sweep overflow may use current period (change sweep as well if this
-  //       is the case)
   if ((*channel->sweep.c_timer_period) > 0x7FF) return 0;
   if (channel->length_counter.length_counter == 0) return 0;
   if (channel->timer.divider < 8) return 0;
@@ -470,12 +468,12 @@ void apu_cycle(apu_t* apu, void* context, apu_enqueue_audio_t enqueue_audio,
   apu_frame_counter_clock(apu);
 
   // Skip samples / downsample
-  if (apu->sample_skips <= 0.0) {
+  if (apu->sample_skips <= 1.0) {
     apu_write_to_buffer(apu, apu_mix(apu));
     if (apu->buffer_cursor == 0) {
       enqueue_audio(context, apu->buffer, AUDIO_BUFFER_SIZE);
     }
-    apu->sample_skips += APU_SAMPLE_RATE / APU_ACTUAL_SAMPLE_RATE;
+    apu->sample_skips += (APU_SAMPLE_RATE / APU_ACTUAL_SAMPLE_RATE);
   } else {
     apu->sample_skips -= 1.0;
   }
