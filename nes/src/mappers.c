@@ -35,6 +35,27 @@ static uint8_t mapper000_ppu_read(mapper_special_t* self, mapper_t* mapper,
   return 0;
 }
 
+// Mapper 1
+static void mapper001_init(mapper_special_t* self, mapper_t* mapper) {}
+
+static void mapper001_deinit(mapper_special_t* self, mapper_t* mapper) {}
+
+static void mapper001_cpu_write(mapper_special_t* self, mapper_t* mapper,
+                                uint16_t address, uint8_t val) {}
+
+static uint8_t mapper001_cpu_read(mapper_special_t* self, mapper_t* mapper,
+                                  uint16_t address) {
+  return 0;
+}
+
+static void mapper001_ppu_write(mapper_special_t* self, mapper_t* mapper,
+                                uint16_t address, uint8_t val) {}
+
+static uint8_t mapper001_ppu_read(mapper_special_t* self, mapper_t* mapper,
+                                  uint16_t address) {
+  return 0;
+}
+
 // MAPPER 4
 #define BANK_SIZE 0x2000
 
@@ -176,5 +197,5 @@ static uint8_t mapper004_ppu_read(mapper_special_t* self, mapper_t* mapper,
     .ppu_write = NULL, .ppu_read = NULL, .present = false, .data = NULL \
   }
 
-mapper_special_t MAPPERS[NUM_MAPPERS] = {MAPPER(000), NOMAPPER, NOMAPPER,
+mapper_special_t MAPPERS[NUM_MAPPERS] = {MAPPER(000), MAPPER(001), NOMAPPER,
                                          NOMAPPER, MAPPER(004)};
