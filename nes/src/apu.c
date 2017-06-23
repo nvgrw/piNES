@@ -7,10 +7,6 @@
 apu_t* apu_init(void) {
   apu_t* apu = calloc(1, sizeof(apu_t));
   apu->sample_skips = 0.0;
-  apu->buffer = malloc(AUDIO_BUFFER_SIZE * sizeof(apu_buffer_t));
-  for (int i = 0; i < AUDIO_BUFFER_SIZE; i++) {
-    apu->buffer[i] = 0.0;
-  }
   apu->buffer_cursor = 0;
   apu->is_even_cycle = false;
 
