@@ -21,6 +21,14 @@ void apu_unit_envelope_clock(apu_unit_envelope_t* unit) {
   }
 }
 
+u_int8_t apu_unit_envelope_output(apu_unit_envelope_t* unit) {
+  if (unit->c_constant_volume_flag) {
+    return unit->c_volume_envelope;
+  }
+
+  return unit->decay_level_counter;
+}
+
 /* https://wiki.nesdev.com/w/index.php/APU_Sweep */
 void apu_unit_sweep_sweep(apu_unit_sweep_t* unit, bool ones_complement) {
   uint16_t change_amount = (*unit->c_timer_period) >> unit->c_shift_count;
