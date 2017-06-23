@@ -198,8 +198,9 @@ typedef struct ppu {
   bool nmi;
 
   // Palette
-  uint32_t nes_palette[64]; // In ARGB8888 format
-  uint32_t palette_cache[32]; // In ARGB8888 format
+  uint32_t nes_palette_direct[64]; // In ARGB8888 format
+  //uint32_t nes_palette_ntsc[64][3]; // ARGB8888
+  uint32_t palette_cache[32]; // ARGB8888
   uint8_t palette[32]; // Index in nes_palette, cached in palette_cache
 
   // Rendering
@@ -218,6 +219,13 @@ typedef struct ppu {
     uint8_t raw[256];
   } oam;
   uint8_t oam_address;
+  // Secondary (rendering on the next scanline)
+  uint16_t spr_count_next;
+  uint16_t spr_row_next[8];
+  uint8_t spr_pos_next[8];
+  uint8_t spr_priority_next[8];
+  uint8_t spr_index_next[8];
+  // Tertiary (rendering on the current scanline)
   uint16_t spr_count;
   uint32_t spr_pat[8];
   uint8_t spr_pos[8];

@@ -58,7 +58,9 @@ static void ppu_cycle_addr_nt(ppu_t* ppu) {
 }
 
 static void ppu_cycle_fetch_nt(ppu_t* ppu, bool garbage) {
-  ppu->ren_nt = mmap(ppu, ppu->io_addr);
+  if (!garbage) {
+    ppu->ren_nt = mmap(ppu, ppu->io_addr);
+  }
 }
 
 static void ppu_cycle_addr_at(ppu_t* ppu) {
@@ -179,7 +181,7 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
     case PPU_ADDR_PPUMASK: // 1
       // Destructure register
       ppu->reg_mask.raw = value;
-      ppu->mask_gray = ppu->reg_mask.flags.gray;
+      ppu->mask_gray = ppu->reg_mask.flags.gray ? 0x30 : 0x3F;
       ppu->mask_show_left_bg = ppu->reg_mask.flags.show_left_bg;
       ppu->mask_show_left_sprites = ppu->reg_mask.flags.show_left_sprites;
       ppu->mask_show_bg = ppu->reg_mask.flags.show_bg;
@@ -220,7 +222,7 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
         }
         ppu_addr &= 0x1F;
         ppu->palette[ppu_addr] = value & 0x3F;
-        ppu->palette_cache[ppu_addr] = ppu->nes_palette[value & 0x3F];
+        ppu->palette_cache[ppu_addr] = ppu->nes_palette_direct[value & ppu->mask_gray];
       } else {
         mmap_ppu_write(ppu->mapper, ppu_addr, value);
       }
@@ -321,12 +323,9 @@ void ppu_power(ppu_t* ppu) {
 }
 
 ppu_t* ppu_init(void) {
-  ppu_t* ppu = malloc(sizeof(ppu_t));
+  ppu_t* ppu = calloc(1, sizeof(ppu_t));
   ppu->driver = PPUD_DIRECT;
   ppu->flip = false;
-  for (int i = 0; i < PPU_SCREEN_SIZE; i++){
-    ppu->screen[i] = 0;
-  }
   ppu_power(ppu);
   return ppu;
 }
@@ -349,8 +348,6 @@ void ppu_cycle(ppu_t* ppu) {
     if (line_visible && cycle_visible) {
       // Render a pixel
       uint8_t pixel = 0;
-      uint8_t pixel_bg = 0;
-      uint8_t pixel_sprite = 0;
       if ((ppu->v.raw & 0x3F00) == 0x3F00 && !(ppu->mask_show_bg || ppu->mask_show_sprites)) {
         pixel = ppu->v.raw;
       }
@@ -362,7 +359,7 @@ void ppu_cycle(ppu_t* ppu) {
 
       // Render background
       if (show_bg_e) {
-        pixel_bg = ((uint32_t)(ppu->tile_data >> 32) >> ((7 - ppu->x) * 4)) & 0x0F;
+        uint8_t pixel_bg = ((uint32_t)(ppu->tile_data >> 32) >> ((7 - ppu->x) * 4)) & 0x0F;
         if (pixel_bg & 3) {
           // Show the pixel if it is non-transparent
           pixel = pixel_bg;
@@ -373,6 +370,7 @@ void ppu_cycle(ppu_t* ppu) {
 
       // Render sprites
       if (show_sprites_e) {
+        uint8_t pixel_sprite = 0;
         uint8_t spr_found = 0xFF;
         for (uint8_t i = 0; i < ppu->spr_count; i++) {
           int16_t offset = (ppu->cycle - 1) - ppu->spr_pos[i];
@@ -402,19 +400,17 @@ void ppu_cycle(ppu_t* ppu) {
 
       // PROFILER_POINT(SYS_PPU_SPRITES)
 
-      // Apply the palette
-      pixel = ppu->palette[pixel] & (ppu->mask_gray ? 0x30 : 0x3F);
-
       // Use the current driver to render the pixel
       switch (ppu->driver) {
         case PPUD_DIRECT:
-          ppu->screen_dbg[ppu->cycle - 1 + ppu->scanline * 256] = pixel;
-          ppu->screen[ppu->cycle - 1 + ppu->scanline * 256]
-            = ppu->nes_palette[pixel];
+          // Apply the palette
+          //pixel = ppu->palette[pixel] & ppu->mask_gray;
+          //ppu->screen_dbg[ppu->cycle - 1 + ppu->scanline * 256] = ppu->palette[pixel] & ppu->mask_gray;
+          ppu->screen[ppu->cycle - 1 + ppu->scanline * 256] = ppu->palette_cache[pixel];
           // Emphasis | (reg.EmpRGB << 6);
           break;
         case PPUD_SIGNAL:
-          // TODO: Emulate NTSC signal generation + noise + decoding
+          // TODO: NTSC signal
           break;
       }
     }
@@ -441,6 +437,62 @@ void ppu_cycle(ppu_t* ppu) {
         case 0:
           ppu_cycle_bg_high(ppu);
           ppu_cycle_tile(ppu);
+          break;
+      }
+      if (ppu->cycle == 63) {
+        // OAM clear
+        ppu->spr_count_max += ppu->spr_count_next;
+        ppu->spr_count_next = 0;
+      } else if (line_visible && ppu->cycle >= 64 && ppu->cycle <= 256 && ppu->cycle % 3 == 1) {
+        // Sprite evaluation
+        uint8_t i = (ppu->cycle - 65) / 3;
+        if (ppu->spr_count_next < 9) {
+          uint8_t y = ppu->oam.sprites[i].y;
+          if (ppu->scanline >= y) {
+            uint16_t row = ppu->scanline - y;
+            if (row < ppu->sprite_size) {
+              if (ppu->spr_count_next < 8) {
+                oam_attr_t attr = {.raw = ppu->oam.sprites[i].attr};
+                ppu->spr_row_next[ppu->spr_count_next] = row;
+                ppu->spr_pos_next[ppu->spr_count_next] = ppu->oam.sprites[i].x;
+                ppu->spr_priority_next[ppu->spr_count_next] = attr.attr.priority;
+                ppu->spr_index_next[ppu->spr_count_next] = i;
+                ppu->spr_count_next++; 
+              } else {
+                ppu->status_overflow = true;
+              }
+            }
+          }
+        }
+      }
+    } else if (line_render && !cycle_fetch) {
+      // Sprite fetches
+      if (ppu->cycle == 257) {
+        ppu->spr_count = 0;
+      }
+      switch (ppu->cycle % 8) {
+        case 1:
+          ppu_cycle_addr_nt(ppu);
+          break;
+        case 2:
+          ppu_cycle_fetch_nt(ppu, true); // Garbage
+          break;
+        case 3:
+          ppu_cycle_addr_at(ppu);
+          break;
+        case 4:
+          ppu_cycle_fetch_at(ppu, true); // Garbage
+          break;
+        case 5:
+          if (ppu->spr_count < 8 && ppu->spr_count < ppu->spr_count_next) {
+            ppu->spr_pat[ppu->spr_count]
+              = ppu_fetch_sprite(ppu, ppu->spr_index_next[ppu->spr_count],
+                                 ppu->spr_row_next[ppu->spr_count]);
+            ppu->spr_pos[ppu->spr_count] = ppu->spr_pos_next[ppu->spr_count];
+            ppu->spr_priority[ppu->spr_count] = ppu->spr_priority_next[ppu->spr_count];
+            ppu->spr_index[ppu->spr_count] = ppu->spr_index_next[ppu->spr_count];
+            ppu->spr_count++;
+          }
           break;
       }
     }
@@ -486,35 +538,6 @@ void ppu_cycle(ppu_t* ppu) {
         // hori(v) = hori(t)
         ppu->v.scroll.x_coarse = ppu->t.scroll.x_coarse;
         ppu->v.scroll.nx = ppu->t.scroll.nx;
-      }
-    }
-
-    if (ppu->cycle == 257) {
-      // Evaluate sprites (not HW-accurate for now)
-      ppu->spr_count_max += ppu->spr_count;
-      ppu->spr_count = 0;
-      if (line_visible) {
-        for (uint8_t i = 0; i < 64 && ppu->spr_count < 9; i++) {
-          uint8_t x = ppu->oam.sprites[i].x;
-          uint8_t y = ppu->oam.sprites[i].y;
-          oam_attr_t attr = {.raw = ppu->oam.sprites[i].attr};
-          if (ppu->scanline < y) {
-            continue;
-          }
-          uint16_t row = ppu->scanline - y;
-          if (row >= ppu->sprite_size) {
-            continue;
-          }
-          if (ppu->spr_count < 8) {
-            ppu->spr_pat[ppu->spr_count] = ppu_fetch_sprite(ppu, i, row);
-            ppu->spr_pos[ppu->spr_count] = x;
-            ppu->spr_priority[ppu->spr_count] = attr.attr.priority;
-            ppu->spr_index[ppu->spr_count] = i;
-            ppu->spr_count++;
-          } else {
-            ppu->status_overflow = true;
-          }
-        }
       }
     }
   }

@@ -181,7 +181,7 @@ static void flip(front_sdl_impl_t* impl) {
         // Display the NES palette instead
         for (int i = 0; i < 64; i++) {
           rect.h = 4;
-          uint32_t colour = sys->ppu->nes_palette[i];
+          uint32_t colour = sys->ppu->nes_palette_direct[i];
           SDL_SetRenderDrawColor(impl->renderer, colour >> 16, colour >> 8,
                                  colour, 0xFF);
           rect.x = (i % 16) * 16;
@@ -428,7 +428,7 @@ front_sdl_impl_t* front_sdl_impl_init(front_t* front) {
     uint8_t g;
     uint8_t b;
     SDL_GetRGB(colour, ui->format, &r, &g, &b);
-    front->sys->ppu->nes_palette[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
+    front->sys->ppu->nes_palette_direct[i] = 0xFF000000 | (r << 16) | (g << 8) | b;
   }
 
   // Create window
