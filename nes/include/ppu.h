@@ -1,3 +1,28 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017
+ * Aurel Bily, Alexis I. Marinoiu, Andrei V. Serbanescu, Niklas Vangerow
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #pragma once
 
 #include <stdbool.h>
@@ -7,7 +32,7 @@
 
 /**
  * ppu.h
- * 
+ *
  * Functions for the PPU (Picture Processing Unit).
  */
 
@@ -64,10 +89,7 @@ typedef union {
 /**
  * Methods to render the signal coming from the PPU.
  */
-typedef enum {
-  PPUD_DIRECT,
-  PPUD_SIGNAL
-} ppu_driver_t;
+typedef enum { PPUD_DIRECT, PPUD_SIGNAL } ppu_driver_t;
 
 /**
  * Structs for the OAM.
@@ -189,8 +211,8 @@ typedef struct ppu {
   bool oam_data_ff;
 
   // Internal registers
-  scroll_reg_t v; // Current VRAM address
-  scroll_reg_t t; // Temporary VRAM address
+  scroll_reg_t v;  // Current VRAM address
+  scroll_reg_t t;  // Temporary VRAM address
   uint8_t x;
   bool w;
   bool nmi_occurred;
@@ -198,10 +220,10 @@ typedef struct ppu {
   bool nmi;
 
   // Palette
-  uint32_t nes_palette_direct[64]; // In ARGB8888 format
-  //uint32_t nes_palette_ntsc[64][3]; // ARGB8888
-  uint32_t palette_cache[32]; // ARGB8888
-  uint8_t palette[32]; // Index in nes_palette, cached in palette_cache
+  uint32_t nes_palette_direct[64];  // In ARGB8888 format
+  // uint32_t nes_palette_ntsc[64][3]; // ARGB8888
+  uint32_t palette_cache[32];  // ARGB8888
+  uint8_t palette[32];         // Index in nes_palette, cached in palette_cache
 
   // Rendering
   uint16_t io_addr;

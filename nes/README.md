@@ -1,6 +1,5 @@
-## Extension - NES emulator "pines"
-
-### Compiling
+# NES emulator "piNES"
+## Compiling
 
 This is the main directory for the extension. The emulator has the following dependencies:
 
@@ -16,9 +15,9 @@ cmake ..
 make
 ```
 
-There is a Makefile included with the project, although it is currently mostly OS X specific (the compiler receives `-framework` flags). To compile, you need to have `sdl2-config` installed and in `$PATH` (otherwise set `$SDL_CFLAGS` and `$SDL_LDFLAGS` manually). The `$SDL_IMAGE_DIR` and `$NFD_DIR` environmental variables have to be set before running `make`, otherwise they default to `libs/SDL_image` and `libs/nativefiledialog`.
+CMake will automatically find the SDL libraries and compile nativefiledialog.
 
-### Usage
+## Usage
 
 After compilation, the emulator needs to be invoked from the `nes` directory. For example:
 

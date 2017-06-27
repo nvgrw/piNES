@@ -1,3 +1,28 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017
+ * Aurel Bily, Alexis I. Marinoiu, Andrei V. Serbanescu, Niklas Vangerow
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include "rom.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -283,7 +308,7 @@ bool rom_has_bus_conflicts(mapper_t* mapper) {
   } else
 
 #undef MEMACCESS_VALID
-#define MEMACCESS_VALID(WHAT, WHERE, EXACTLY, WRITE)                        \
+#define MEMACCESS_VALID(WHAT, WHERE, EXACTLY, WRITE) \
   if (mapper->mapped.WHAT != NULL)
 
 // Memory access functions
@@ -381,7 +406,7 @@ uint8_t mmap_cpu_read(mapper_t* mapper, uint16_t address, bool dummy) {
 
 void mmap_cpu_dma(mapper_t* mapper, uint8_t address, uint8_t* buf) {
   uint16_t cur = address * 0x100;
-  mapper->cpu->busy += 513; // TODO: odd cycles + 1
+  mapper->cpu->busy += 513;  // TODO: odd cycles + 1
   for (uint16_t i = 0; i < 256; i++) {
     buf[i] = mmap_cpu_read(mapper, cur, false);
     cur++;

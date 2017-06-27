@@ -1,3 +1,28 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017
+ * Aurel Bily, Alexis I. Marinoiu, Andrei V. Serbanescu, Niklas Vangerow
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -11,8 +36,6 @@
 #define IV_RESET 0xFFFC
 #define IV_IRQ_BRK 0xFFFE
 
-// #define DEBUG 1
-
 /**
  * Memory access functions
  */
@@ -22,12 +45,12 @@ static bool is_page_crossed(uint16_t address1, uint16_t address2) {
 
 static uint8_t cpu_mem_read8(cpu_t* cpu, uint16_t address) {
   return mmap_cpu_read(cpu->mapper, address, false);
-  //return cpu->memory[address];
+  // return cpu->memory[address];
 }
 
 static void cpu_mem_write8(cpu_t* cpu, uint16_t address, uint8_t value) {
   mmap_cpu_write(cpu->mapper, address, value);
-  //cpu->memory[address] = value;
+  // cpu->memory[address] = value;
 }
 
 static uint16_t cpu_mem_read16(cpu_t* cpu, uint16_t address) {
@@ -72,8 +95,8 @@ static uint16_t pop16(cpu_t* cpu) {
 }
 
 static void push16(cpu_t* cpu, uint16_t value) {
-  push8(cpu, value >> 8);  // High byte
-  push8(cpu, value & 0xFF);         // Low byte
+  push8(cpu, value >> 8);    // High byte
+  push8(cpu, value & 0xFF);  // Low byte
 }
 
 void cpu_interrupt(cpu_t* cpu, interrupt_type_t type) {
@@ -194,16 +217,15 @@ void jit_one(cpu_t* cpu, uint16_t pc) {
   uint16_t address = 0;
   bool page_crossed = false;
   bool requires_state = false;
-  instr_address(cpu, instr, pc, &bytes_used, &address,
-                &page_crossed, &requires_state);
+  instr_address(cpu, instr, pc, &bytes_used, &address, &page_crossed,
+                &requires_state);
   if (!requires_state && instr.implementation != NULL) {
     cpu->compiled[pc] = (jit_instruction_t){
-      .compiled = false,
-      .execute = instr.implementation,
-      .address = address,
-      .cycles = instr.cycles + (instr.cycle_cross && page_crossed ? 1 : 0),
-      .size = bytes_used
-    };
+        .compiled = false,
+        .execute = instr.implementation,
+        .address = address,
+        .cycles = instr.cycles + (instr.cycle_cross && page_crossed ? 1 : 0),
+        .size = bytes_used};
   }
 }
 
@@ -215,7 +237,7 @@ void jit_all(cpu_t* cpu) {
 
 cpu_t* cpu_init() {
   cpu_t* cpu = calloc(1, sizeof(cpu_t));
-  //ret->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
+  // ret->memory = malloc(sizeof(uint8_t) * MEMORY_SIZE);
   cpu->compiled = calloc(MEMORY_SIZE, sizeof(jit_instruction_t));
   /*
   for (int i = 0; i < MEMORY_SIZE; i++) {
@@ -251,7 +273,7 @@ void cpu_reset(cpu_t* cpu) {
 }
 
 void cpu_deinit(cpu_t* cpu) {
-  //free(cpu->memory);
+  // free(cpu->memory);
   free(cpu->compiled);
   free(cpu);
 }
@@ -787,12 +809,16 @@ void cpu_impl_tya(cpu_t* cpu, uint16_t address) {
 }
 
 // Macros to define instructions
-#define I(A, B, C) \
-  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
-    .cycles = C, .cycle_cross = false }
-#define IC(A, B, C) \
-  { .mode = AM_ ## A, .mnemonic = #B, .implementation = &cpu_impl_ ## B, \
-    .cycles = C, .cycle_cross = true }
+#define I(A, B, C)                                                   \
+  {                                                                  \
+    .mode = AM_##A, .mnemonic = #B, .implementation = &cpu_impl_##B, \
+    .cycles = C, .cycle_cross = false                                \
+  }
+#define IC(A, B, C)                                                  \
+  {                                                                  \
+    .mode = AM_##A, .mnemonic = #B, .implementation = &cpu_impl_##B, \
+    .cycles = C, .cycle_cross = true                                 \
+  }
 #define NI \
   { .mode = AM_ACCUMULATOR, .mnemonic = "###", .implementation = NULL }
 

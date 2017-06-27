@@ -1,3 +1,28 @@
+/**
+ * MIT License
+ *
+ * Copyright (c) 2017
+ * Aurel Bily, Alexis I. Marinoiu, Andrei V. Serbanescu, Niklas Vangerow
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,31 +37,31 @@
 
 /**
  * Helper functions
- * 
+ *
  * mmap
  *   Reads the VRAM at the given address.
- * 
+ *
  * ppu_cycle_addr_nt
  *   Sets the PPU address bus to a nametable entry.
- * 
+ *
  * ppu_cycle_fetch_nt
  *   Reads a nametable entry.
- * 
+ *
  * ppu_cycle_addr_at
  *   Sets the PPU address bus to an attribute table entry.
- * 
+ *
  * ppu_cycle_fetch_at
  *   Reads an attribute table entry.
- * 
+ *
  * ppu_cycle_bg_low
  *   Reads the low byte of a BG tile.
- * 
+ *
  * ppu_cycle_bg_high
  *   Reads the high byte of a BG tile.
- * 
+ *
  * ppu_cycle_tile
  *   Combines attributes, low and high bytes of tile.
- * 
+ *
  * ppu_fetch_sprite
  *   Fetches and decodes a sprite from the OAM.
  */
@@ -69,8 +94,9 @@ static void ppu_cycle_addr_at(ppu_t* ppu) {
 }
 
 static void ppu_cycle_fetch_at(ppu_t* ppu, bool garbage) {
-  //uint16_t v = ppu->v.raw;
-  uint8_t shift = (ppu->v.scroll.x_coarse & 2) + 2 * (ppu->v.scroll.y_coarse & 2);
+  // uint16_t v = ppu->v.raw;
+  uint8_t shift =
+      (ppu->v.scroll.x_coarse & 2) + 2 * (ppu->v.scroll.y_coarse & 2);
   uint8_t res = (mmap(ppu, ppu->io_addr) >> shift) & 3;
   if (!garbage) {
     ppu->ren_at = res;
@@ -78,16 +104,14 @@ static void ppu_cycle_fetch_at(ppu_t* ppu, bool garbage) {
 }
 
 static void ppu_cycle_bg_low(ppu_t* ppu) {
-  ppu->io_addr = 0x1000 * (uint16_t)(ppu->ctrl_bg_table) + 
-                 16 * (uint16_t)(ppu->ren_nt) +
-                 ppu->v.scroll.y_fine;
+  ppu->io_addr = 0x1000 * (uint16_t)(ppu->ctrl_bg_table) +
+                 16 * (uint16_t)(ppu->ren_nt) + ppu->v.scroll.y_fine;
   ppu->ren_bg_low = mmap(ppu, ppu->io_addr);
 }
 
 static void ppu_cycle_bg_high(ppu_t* ppu) {
-  ppu->io_addr = 0x1000 * (uint16_t)(ppu->ctrl_bg_table) + 
-                 16 * (uint16_t)(ppu->ren_nt) +
-                 ppu->v.scroll.y_fine;
+  ppu->io_addr = 0x1000 * (uint16_t)(ppu->ctrl_bg_table) +
+                 16 * (uint16_t)(ppu->ren_nt) + ppu->v.scroll.y_fine;
   ppu->ren_bg_high = mmap(ppu, ppu->io_addr + 8);
 }
 
@@ -143,7 +167,7 @@ static uint32_t ppu_fetch_sprite(ppu_t* ppu, uint8_t i, uint16_t row) {
 
 /**
  * Public funcitons
- * 
+ *
  * See ppu.h for descriptions.
  */
 void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
@@ -162,7 +186,7 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
   address &= 0x7;
 
   switch (address) {
-    case PPU_ADDR_PPUCTRL: // 0
+    case PPU_ADDR_PPUCTRL:  // 0
       // Destructure register
       ppu->reg_ctrl.raw = value;
       ppu->ctrl_nametable = ppu->reg_ctrl.flags.nametable;
@@ -178,7 +202,7 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
       ppu->t.nt_select.nt = ppu->ctrl_nametable;
       ppu->nmi_output = ppu->ctrl_nmi;
       break;
-    case PPU_ADDR_PPUMASK: // 1
+    case PPU_ADDR_PPUMASK:  // 1
       // Destructure register
       ppu->reg_mask.raw = value;
       ppu->mask_gray = ppu->reg_mask.flags.gray ? 0x30 : 0x3F;
@@ -187,14 +211,14 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
       ppu->mask_show_bg = ppu->reg_mask.flags.show_bg;
       ppu->mask_show_sprites = ppu->reg_mask.flags.show_sprites;
       break;
-    case PPU_ADDR_OAMADDR: // 3
+    case PPU_ADDR_OAMADDR:  // 3
       ppu->oam_address = value;
       break;
-    case PPU_ADDR_OAMDATA: // 4
+    case PPU_ADDR_OAMDATA:  // 4
       ppu->oam.raw[ppu->oam_address] = value;
       ppu->oam_address++;
       break;
-    case PPU_ADDR_PPUSCROLL: // 5
+    case PPU_ADDR_PPUSCROLL:  // 5
       if (!ppu->w) {
         ppu->t.scroll.x_coarse = value >> 3;
         ppu->x = value & 0x7;
@@ -204,7 +228,7 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
       }
       ppu->w = !ppu->w;
       break;
-    case PPU_ADDR_PPUADDR: // 6
+    case PPU_ADDR_PPUADDR:  // 6
       if (!ppu->w) {
         ppu->t.raw = (ppu->t.raw & 0xFF) | ((value & 0x3F) << 8);
       } else {
@@ -213,7 +237,7 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
       }
       ppu->w = !ppu->w;
       break;
-    case PPU_ADDR_PPUDATA: { // 7
+    case PPU_ADDR_PPUDATA: {  // 7
       uint16_t ppu_addr = ppu->v.raw & 0x3FFF;
       if (ppu_addr >= 0x3F00) {
         ppu_addr -= 0x3F00;
@@ -222,7 +246,8 @@ void ppu_mem_write(ppu_t* ppu, uint16_t address, uint8_t value) {
         }
         ppu_addr &= 0x1F;
         ppu->palette[ppu_addr] = value & 0x3F;
-        ppu->palette_cache[ppu_addr] = ppu->nes_palette_direct[value & ppu->mask_gray];
+        ppu->palette_cache[ppu_addr] =
+            ppu->nes_palette_direct[value & ppu->mask_gray];
       } else {
         mmap_ppu_write(ppu->mapper, ppu_addr, value);
       }
@@ -244,7 +269,7 @@ uint8_t ppu_mem_read(ppu_t* ppu, uint16_t address, bool dummy) {
   address &= 0x7;
 
   switch (address) {
-    case PPU_ADDR_PPUSTATUS: { // 2
+    case PPU_ADDR_PPUSTATUS: {  // 2
       // Encode register
       ppu->reg_status.flags.last_write = ppu->last_reg_write;
       ppu->reg_status.flags.overflow = ppu->status_overflow;
@@ -257,13 +282,13 @@ uint8_t ppu_mem_read(ppu_t* ppu, uint16_t address, bool dummy) {
       }
       return ppu->reg_status.raw;
     }
-    case PPU_ADDR_OAMDATA: // 4
+    case PPU_ADDR_OAMDATA:  // 4
       if (ppu->oam_data_ff) {
         return 0xFF;
       }
       // TODO: ignore when rendering
       return ppu->oam.raw[ppu->oam_address];
-    case PPU_ADDR_PPUDATA: { // 7
+    case PPU_ADDR_PPUDATA: {  // 7
       uint16_t ppu_addr = ppu->v.raw & 0x3FFF;
       uint8_t ret = 0;
       if (ppu_addr >= 0x3F00) {
@@ -348,18 +373,22 @@ void ppu_cycle(ppu_t* ppu) {
     if (line_visible && cycle_visible) {
       // Render a pixel
       uint8_t pixel = 0;
-      if ((ppu->v.raw & 0x3F00) == 0x3F00 && !(ppu->mask_show_bg || ppu->mask_show_sprites)) {
+      if ((ppu->v.raw & 0x3F00) == 0x3F00 &&
+          !(ppu->mask_show_bg || ppu->mask_show_sprites)) {
         pixel = ppu->v.raw;
       }
 
       bool edge = (ppu->cycle < 8 || (ppu->cycle >= 249 && ppu->cycle <= 256));
-      bool edge_masked = edge || (!ppu->mask_show_left_bg || !ppu->mask_show_left_sprites);
+      bool edge_masked =
+          edge || (!ppu->mask_show_left_bg || !ppu->mask_show_left_sprites);
       bool show_bg_e = show_bg && (!edge || ppu->mask_show_left_bg);
-      bool show_sprites_e = show_sprites && (!edge || ppu->mask_show_left_sprites);
+      bool show_sprites_e =
+          show_sprites && (!edge || ppu->mask_show_left_sprites);
 
       // Render background
       if (show_bg_e) {
-        uint8_t pixel_bg = ((uint32_t)(ppu->tile_data >> 32) >> ((7 - ppu->x) * 4)) & 0x0F;
+        uint8_t pixel_bg =
+            ((uint32_t)(ppu->tile_data >> 32) >> ((7 - ppu->x) * 4)) & 0x0F;
         if (pixel_bg & 3) {
           // Show the pixel if it is non-transparent
           pixel = pixel_bg;
@@ -404,9 +433,11 @@ void ppu_cycle(ppu_t* ppu) {
       switch (ppu->driver) {
         case PPUD_DIRECT:
           // Apply the palette
-          //pixel = ppu->palette[pixel] & ppu->mask_gray;
-          //ppu->screen_dbg[ppu->cycle - 1 + ppu->scanline * 256] = ppu->palette[pixel] & ppu->mask_gray;
-          ppu->screen[ppu->cycle - 1 + ppu->scanline * 256] = ppu->palette_cache[pixel];
+          // pixel = ppu->palette[pixel] & ppu->mask_gray;
+          // ppu->screen_dbg[ppu->cycle - 1 + ppu->scanline * 256] =
+          // ppu->palette[pixel] & ppu->mask_gray;
+          ppu->screen[ppu->cycle - 1 + ppu->scanline * 256] =
+              ppu->palette_cache[pixel];
           // Emphasis | (reg.EmpRGB << 6);
           break;
         case PPUD_SIGNAL:
@@ -443,7 +474,8 @@ void ppu_cycle(ppu_t* ppu) {
         // OAM clear
         ppu->spr_count_max += ppu->spr_count_next;
         ppu->spr_count_next = 0;
-      } else if (line_visible && ppu->cycle >= 64 && ppu->cycle <= 256 && ppu->cycle % 3 == 1) {
+      } else if (line_visible && ppu->cycle >= 64 && ppu->cycle <= 256 &&
+                 ppu->cycle % 3 == 1) {
         // Sprite evaluation
         uint8_t i = (ppu->cycle - 65) / 3;
         if (ppu->spr_count_next < 9) {
@@ -455,9 +487,10 @@ void ppu_cycle(ppu_t* ppu) {
                 oam_attr_t attr = {.raw = ppu->oam.sprites[i].attr};
                 ppu->spr_row_next[ppu->spr_count_next] = row;
                 ppu->spr_pos_next[ppu->spr_count_next] = ppu->oam.sprites[i].x;
-                ppu->spr_priority_next[ppu->spr_count_next] = attr.attr.priority;
+                ppu->spr_priority_next[ppu->spr_count_next] =
+                    attr.attr.priority;
                 ppu->spr_index_next[ppu->spr_count_next] = i;
-                ppu->spr_count_next++; 
+                ppu->spr_count_next++;
               } else {
                 ppu->status_overflow = true;
               }
@@ -475,22 +508,24 @@ void ppu_cycle(ppu_t* ppu) {
           ppu_cycle_addr_nt(ppu);
           break;
         case 2:
-          ppu_cycle_fetch_nt(ppu, true); // Garbage
+          ppu_cycle_fetch_nt(ppu, true);  // Garbage
           break;
         case 3:
           ppu_cycle_addr_at(ppu);
           break;
         case 4:
-          ppu_cycle_fetch_at(ppu, true); // Garbage
+          ppu_cycle_fetch_at(ppu, true);  // Garbage
           break;
         case 5:
           if (ppu->spr_count < 8 && ppu->spr_count < ppu->spr_count_next) {
-            ppu->spr_pat[ppu->spr_count]
-              = ppu_fetch_sprite(ppu, ppu->spr_index_next[ppu->spr_count],
+            ppu->spr_pat[ppu->spr_count] =
+                ppu_fetch_sprite(ppu, ppu->spr_index_next[ppu->spr_count],
                                  ppu->spr_row_next[ppu->spr_count]);
             ppu->spr_pos[ppu->spr_count] = ppu->spr_pos_next[ppu->spr_count];
-            ppu->spr_priority[ppu->spr_count] = ppu->spr_priority_next[ppu->spr_count];
-            ppu->spr_index[ppu->spr_count] = ppu->spr_index_next[ppu->spr_count];
+            ppu->spr_priority[ppu->spr_count] =
+                ppu->spr_priority_next[ppu->spr_count];
+            ppu->spr_index[ppu->spr_count] =
+                ppu->spr_index_next[ppu->spr_count];
             ppu->spr_count++;
           }
           break;
@@ -578,6 +613,4 @@ void ppu_cycle(ppu_t* ppu) {
   // PROFILER_POINT(SYS_PPU_LOGIC)
 }
 
-void ppu_deinit(ppu_t* ppu) {
-  free(ppu);
-}
+void ppu_deinit(ppu_t* ppu) { free(ppu); }
