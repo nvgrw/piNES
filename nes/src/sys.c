@@ -107,7 +107,7 @@ bool sys_run(sys_t* sys, uint32_t ms, void* context,
         (*CONTROLLER_DRIVERS[i].poll)(sys->controller);
       }
 
-      if (*((uint8_t*)&sys->controller->pressed1) == 0xFF) {
+      if (sys->controller->pressed1.select && sys->controller->pressed1.start) {
         sys_stop(sys);
         sys_start(sys);
       }
