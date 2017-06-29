@@ -46,7 +46,7 @@
  * This struct keeps track of which buttons are currently being pressed on
  * a controller.
  */
-typedef struct {
+typedef struct __attribute__((packed)) {
   uint8_t a : 1;
   uint8_t b : 1;
   uint8_t select : 1;

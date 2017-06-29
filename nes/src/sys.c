@@ -60,6 +60,8 @@ sys_t* sys_init(void) {
 #define CLOCKS_PER_MILLISECOND 21477.272
 #define CLOCK_PERIOD (12.0 / CLOCKS_PER_MILLISECOND)
 
+static void sys_reset(sys_t* sys);
+
 bool sys_run(sys_t* sys, uint32_t ms, void* context,
              apu_enqueue_audio_t enqueue_audio,
              apu_get_queue_size_t get_queue_size) {
@@ -103,6 +105,11 @@ bool sys_run(sys_t* sys, uint32_t ms, void* context,
       controller_clear(sys->controller);
       for (int i = 0; i < NUM_CONTROLLER_DRIVERS; i++) {
         (*CONTROLLER_DRIVERS[i].poll)(sys->controller);
+      }
+
+      if (*((uint8_t*)&sys->controller->pressed1) == 0xFF) {
+        sys_stop(sys);
+        sys_start(sys);
       }
     }
   }
