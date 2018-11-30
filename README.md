@@ -14,7 +14,7 @@ The repository is structured in the following way
  - `/nes` - The piNES NES emulator. Build instructions are in this directory.
  - `/tcp_client` - The pi-side NES controller driver.
 
-## Extension - NES emulator "pines"
+## Extension - NES emulator "piNES"
 For the extension we have decided to create an emulator of the NES (Nintendo
 Entertainment System). Currently the goal is to make this emulator work with the
 SDL library for possible cross-platform compatibility. However, we are also
