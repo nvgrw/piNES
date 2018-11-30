@@ -38,3 +38,5 @@ emulate/build/
 ._.DS_Store
 compile_commands.json
 programs/kernel.img
+
+/tcp_client/bin

@@ -192,6 +192,8 @@ int main(int argc, char** argv) {
     poll_controllers();
     buffer[0] = cntrl_1.raw;
     buffer[1] = cntrl_2.raw;
+    printf("\r%02x %02x", buffer[0], buffer[1]);
+    fflush(stdout);
     n = write(sockfd, buffer, 2);
     if (n < 0) {
       error("ERROR writing to socket");
